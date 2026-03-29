@@ -33,6 +33,12 @@ export class KeyboardController {
         this._toggleFullscreen();
         break;
 
+      case 'c':
+      case 'C':
+        e.preventDefault();
+        window.open('/config', '_blank');
+        break;
+
       case 'm':
       case 'M':
         e.preventDefault();

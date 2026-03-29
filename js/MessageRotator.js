@@ -7,6 +7,23 @@ export class MessageRotator {
     this.currentIndex = -1;
     this._timer = null;
     this._paused = false;
+    this._messageInterval = MESSAGE_INTERVAL;
+    this._totalTransition = TOTAL_TRANSITION;
+  }
+
+  applyConfig(cfg) {
+    this._messageInterval = cfg.timing.message_interval;
+    this._totalTransition = cfg.timing.total_transition;
+    this.messages = cfg.messages;
+    // Clamp index in case message count shrank
+    if (this.currentIndex >= this.messages.length) {
+      this.currentIndex = 0;
+    }
+    // Restart timer with new interval
+    if (this._timer) {
+      this.stop();
+      this.start();
+    }
   }
 
   start() {
@@ -18,7 +35,7 @@ export class MessageRotator {
       if (!this._paused && !this.board.isTransitioning) {
         this.next();
       }
-    }, MESSAGE_INTERVAL + TOTAL_TRANSITION);
+    }, this._messageInterval + this._totalTransition);
   }
 
   stop() {
@@ -26,6 +43,15 @@ export class MessageRotator {
       clearInterval(this._timer);
       this._timer = null;
     }
+  }
+
+  pause() {
+    this._paused = true;
+  }
+
+  resume() {
+    this._paused = false;
+    this._resetAutoRotation();
   }
 
   next() {
@@ -48,7 +74,7 @@ export class MessageRotator {
         if (!this._paused && !this.board.isTransitioning) {
           this.next();
         }
-      }, MESSAGE_INTERVAL + TOTAL_TRANSITION);
+      }, this._messageInterval + this._totalTransition);
     }
   }
 }

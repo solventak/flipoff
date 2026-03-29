@@ -1,0 +1,18 @@
+services:
+  flipoff:
+    build: .
+    image: flipoff:latest
+    container_name: flipoff
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persistent config (survives redeploys)
+      - ./data:/data
+      # Docker socket so the server can trigger redeploys from inside the container
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Repo mount so deploy.sh can git pull and rebuild
+      - .:/repo
+    environment:
+      CONFIG_FILE: /data/config.json
+      REPO_DIR: /repo

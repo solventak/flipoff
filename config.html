@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlipOff — Config</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background: #F0F0F0;
+      color: #111;
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .header a {
+      font-size: 14px;
+      color: #666;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .header a:hover { color: #000; }
+
+    /* Sections */
+    .section {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .section h2 {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #888;
+      margin-bottom: 20px;
+    }
+
+    /* Form rows */
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .row:last-child { margin-bottom: 0; }
+
+    label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+      min-width: 160px;
+      flex-shrink: 0;
+    }
+
+    input[type="number"] {
+      width: 90px;
+      padding: 8px 10px;
+      border: 1.5px solid #E0E0E0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #999;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    /* Color swatches */
+    .color-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .color-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .color-item input[type="color"] {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 2px;
+      background: none;
+    }
+
+    .color-item .remove-color {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ff3b30;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: none;
+      line-height: 1;
+    }
+
+    .add-color {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1.5px dashed #ccc;
+      background: none;
+      font-size: 20px;
+      color: #aaa;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .add-color:hover { border-color: #999; color: #555; }
+
+    /* Messages */
+    .message-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .message-item {
+      border: 1.5px solid #E8E8E8;
+      border-radius: 10px;
+      padding: 14px;
+      position: relative;
+    }
+
+    .message-item .message-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .message-item .message-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .message-item .remove-message {
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: #ccc;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+    }
+
+    .message-item .remove-message:hover { color: #ff3b30; }
+
+    .line-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .line-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .line-row input[type="text"] {
+      flex: 1;
+      padding: 7px 10px;
+      border: 1.5px solid #E0E0E0;
+      border-radius: 7px;
+      font-size: 13px;
+      font-family: monospace;
+      text-transform: uppercase;
+      transition: border-color 0.15s;
+    }
+
+    .line-row input[type="text"]:focus {
+      outline: none;
+      border-color: #999;
+    }
+
+    .line-row .remove-line {
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: #ccc;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .line-row .remove-line:hover { color: #ff3b30; }
+
+    .add-line {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #aaa;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      padding: 0;
+    }
+
+    .add-line:hover { color: #555; }
+
+    .add-message {
+      padding: 12px;
+      border: 1.5px dashed #ccc;
+      border-radius: 10px;
+      background: none;
+      font-size: 14px;
+      color: #aaa;
+      cursor: pointer;
+      width: 100%;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .add-message:hover { border-color: #999; color: #555; }
+
+    /* Save */
+    .save-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .save-btn {
+      padding: 12px 28px;
+      background: #111;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+
+    .save-btn:hover { background: #333; }
+    .save-btn:disabled { background: #ccc; cursor: default; }
+
+    .save-status {
+      font-size: 13px;
+      color: #aaa;
+      transition: color 0.3s;
+    }
+
+    .save-status.ok { color: #00AA55; }
+    .save-status.err { color: #ff3b30; }
+
+    /* Deploy section */
+    .deploy-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .deploy-row:last-child { margin-bottom: 0; }
+
+    .deploy-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+
+    .deploy-btn.primary { background: #111; color: #fff; }
+    .deploy-btn.primary:hover { background: #333; }
+    .deploy-btn.danger { background: #fff; color: #ff3b30; border: 1.5px solid #ff3b30; }
+    .deploy-btn.danger:hover { background: #fff5f5; }
+    .deploy-btn:disabled { opacity: 0.4; cursor: default; }
+
+    .deploy-status {
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    .deploy-status.ok { color: #00AA55; }
+    .deploy-status.err { color: #ff3b30; }
+
+    .deploy-log {
+      margin-top: 12px;
+      padding: 12px;
+      background: #111;
+      color: #aaa;
+      font-family: monospace;
+      font-size: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: none;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>FlipOff. Config</h1>
+    <a href="/" target="_blank">↗ View display</a>
+  </div>
+
+  <!-- Grid -->
+  <div class="section">
+    <h2>Grid</h2>
+    <div class="row">
+      <label>Columns</label>
+      <input type="number" id="grid-cols" min="1" max="64" value="16">
+    </div>
+    <div class="row">
+      <label>Rows</label>
+      <input type="number" id="grid-rows" min="1" max="32" value="10">
+    </div>
+  </div>
+
+  <!-- Timing -->
+  <div class="section">
+    <h2>Timing</h2>
+    <div class="row">
+      <label>Scramble duration</label>
+      <input type="number" id="timing-scramble" min="0" step="50" value="800">
+      <span class="hint">ms</span>
+    </div>
+    <div class="row">
+      <label>Flip duration</label>
+      <input type="number" id="timing-flip" min="0" step="50" value="300">
+      <span class="hint">ms</span>
+    </div>
+    <div class="row">
+      <label>Stagger delay</label>
+      <input type="number" id="timing-stagger" min="0" step="5" value="25">
+      <span class="hint">ms per tile</span>
+    </div>
+    <div class="row">
+      <label>Total transition</label>
+      <input type="number" id="timing-total" min="0" step="100" value="3800">
+      <span class="hint">ms</span>
+    </div>
+    <div class="row">
+      <label>Message interval</label>
+      <input type="number" id="timing-interval" min="0" step="500" value="4000">
+      <span class="hint">ms between messages</span>
+    </div>
+    <div class="row">
+      <label>Temp message duration</label>
+      <input type="number" id="timing-temp-duration" min="1" step="5" value="30">
+      <span class="hint">seconds</span>
+    </div>
+  </div>
+
+  <!-- Colors -->
+  <div class="section">
+    <h2>Scramble Colors</h2>
+    <div class="color-list" id="scramble-colors"></div>
+  </div>
+
+  <div class="section">
+    <h2>Accent Colors</h2>
+    <div class="color-list" id="accent-colors"></div>
+  </div>
+
+  <!-- Messages -->
+  <div class="section">
+    <h2>Messages</h2>
+    <div class="message-list" id="message-list"></div>
+    <button class="add-message" id="add-message" style="margin-top: 12px;">+ Add message</button>
+  </div>
+
+  <!-- Software -->
+  <div class="section">
+    <h2>Software</h2>
+    <div class="deploy-row">
+      <button class="deploy-btn primary" id="deploy-btn">↓ Deploy latest</button>
+      <button class="deploy-btn danger" id="rollback-btn">↩ Rollback</button>
+      <span class="deploy-status" id="deploy-status"></span>
+    </div>
+    <pre class="deploy-log" id="deploy-log"></pre>
+  </div>
+
+  <!-- Save -->
+  <div class="save-bar">
+    <button class="save-btn" id="save-btn">Save</button>
+    <span class="save-status" id="save-status"></span>
+  </div>
+</div>
+
+<script>
+  let config = {};
+
+  // Load config from API
+  async function loadConfig() {
+    const res = await fetch('/api/config');
+    config = await res.json();
+    render();
+  }
+
+  function render() {
+    document.getElementById('grid-cols').value = config.grid.cols;
+    document.getElementById('grid-rows').value = config.grid.rows;
+
+    document.getElementById('timing-scramble').value = config.timing.scramble_duration;
+    document.getElementById('timing-flip').value = config.timing.flip_duration;
+    document.getElementById('timing-stagger').value = config.timing.stagger_delay;
+    document.getElementById('timing-total').value = config.timing.total_transition;
+    document.getElementById('timing-interval').value = config.timing.message_interval;
+    document.getElementById('timing-temp-duration').value = config.timing.temp_message_duration ?? 30;
+
+    renderColorList('scramble-colors', config.colors.scramble_colors);
+    renderColorList('accent-colors', config.colors.accent_colors);
+    renderMessages();
+  }
+
+  function renderColorList(containerId, colors) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    colors.forEach((color, i) => {
+      const item = document.createElement('div');
+      item.className = 'color-item';
+
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.value = color;
+      input.addEventListener('input', e => { colors[i] = e.target.value; });
+
+      const remove = document.createElement('button');
+      remove.className = 'remove-color';
+      remove.textContent = '×';
+      remove.addEventListener('click', () => {
+        colors.splice(i, 1);
+        renderColorList(containerId, colors);
+      });
+
+      item.appendChild(input);
+      item.appendChild(remove);
+      el.appendChild(item);
+    });
+
+    const add = document.createElement('button');
+    add.className = 'add-color';
+    add.textContent = '+';
+    add.addEventListener('click', () => {
+      colors.push('#FFFFFF');
+      renderColorList(containerId, colors);
+    });
+    el.appendChild(add);
+  }
+
+  function renderMessages() {
+    const list = document.getElementById('message-list');
+    list.innerHTML = '';
+    config.messages.forEach((lines, mi) => {
+      const item = document.createElement('div');
+      item.className = 'message-item';
+
+      const header = document.createElement('div');
+      header.className = 'message-header';
+
+      const label = document.createElement('span');
+      label.className = 'message-label';
+      label.textContent = `Message ${mi + 1}`;
+
+      const remove = document.createElement('button');
+      remove.className = 'remove-message';
+      remove.textContent = '×';
+      remove.addEventListener('click', () => {
+        config.messages.splice(mi, 1);
+        renderMessages();
+      });
+
+      header.appendChild(label);
+      header.appendChild(remove);
+      item.appendChild(header);
+
+      const lineList = document.createElement('div');
+      lineList.className = 'line-list';
+
+      lines.forEach((line, li) => {
+        const row = document.createElement('div');
+        row.className = 'line-row';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = line;
+        input.placeholder = '(empty line)';
+        input.addEventListener('input', e => { lines[li] = e.target.value; });
+
+        const remove = document.createElement('button');
+        remove.className = 'remove-line';
+        remove.textContent = '×';
+        remove.addEventListener('click', () => {
+          lines.splice(li, 1);
+          renderMessages();
+        });
+
+        row.appendChild(input);
+        row.appendChild(remove);
+        lineList.appendChild(row);
+      });
+
+      const addLine = document.createElement('button');
+      addLine.className = 'add-line';
+      addLine.textContent = '+ Add line';
+      addLine.addEventListener('click', () => {
+        lines.push('');
+        renderMessages();
+      });
+
+      item.appendChild(lineList);
+      item.appendChild(addLine);
+      list.appendChild(item);
+    });
+  }
+
+  function collectConfig() {
+    return {
+      grid: {
+        cols: parseInt(document.getElementById('grid-cols').value),
+        rows: parseInt(document.getElementById('grid-rows').value),
+      },
+      timing: {
+        scramble_duration: parseInt(document.getElementById('timing-scramble').value),
+        flip_duration: parseInt(document.getElementById('timing-flip').value),
+        stagger_delay: parseInt(document.getElementById('timing-stagger').value),
+        total_transition: parseInt(document.getElementById('timing-total').value),
+        message_interval: parseInt(document.getElementById('timing-interval').value),
+        temp_message_duration: parseInt(document.getElementById('timing-temp-duration').value),
+      },
+      colors: {
+        scramble_colors: config.colors.scramble_colors,
+        accent_colors: config.colors.accent_colors,
+      },
+      messages: config.messages,
+    };
+  }
+
+  async function save() {
+    const btn = document.getElementById('save-btn');
+    const status = document.getElementById('save-status');
+    btn.disabled = true;
+    status.className = 'save-status';
+    status.textContent = 'Saving…';
+
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(collectConfig()),
+      });
+      if (!res.ok) throw new Error(res.statusText);
+      status.className = 'save-status ok';
+      status.textContent = 'Saved ✓';
+      setTimeout(() => { status.textContent = ''; }, 2000);
+    } catch (e) {
+      status.className = 'save-status err';
+      status.textContent = 'Error saving — ' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('save-btn').addEventListener('click', save);
+  document.getElementById('add-message').addEventListener('click', () => {
+    config.messages.push(['', '', '', '', '']);
+    renderMessages();
+  });
+
+  // Deploy / Rollback
+  async function runDeploy(endpoint, label) {
+    const deployBtn = document.getElementById('deploy-btn');
+    const rollbackBtn = document.getElementById('rollback-btn');
+    const statusEl = document.getElementById('deploy-status');
+    const logEl = document.getElementById('deploy-log');
+
+    deployBtn.disabled = true;
+    rollbackBtn.disabled = true;
+    statusEl.className = 'deploy-status';
+    statusEl.textContent = `${label}…`;
+    logEl.style.display = 'none';
+    logEl.textContent = '';
+
+    try {
+      const res = await fetch(endpoint, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        statusEl.className = 'deploy-status err';
+        statusEl.textContent = `${label} failed`;
+        logEl.textContent = data.detail || JSON.stringify(data);
+        logEl.style.display = 'block';
+      } else {
+        statusEl.className = 'deploy-status ok';
+        statusEl.textContent = `${label} succeeded ✓`;
+        if (data.output) {
+          logEl.textContent = data.output;
+          logEl.style.display = 'block';
+        }
+      }
+    } catch (e) {
+      statusEl.className = 'deploy-status err';
+      statusEl.textContent = 'Network error — ' + e.message;
+    } finally {
+      deployBtn.disabled = false;
+      rollbackBtn.disabled = false;
+    }
+  }
+
+  document.getElementById('deploy-btn').addEventListener('click', () => runDeploy('/api/deploy', 'Deploy'));
+  document.getElementById('rollback-btn').addEventListener('click', () => {
+    if (confirm('Roll back to the previous version?')) runDeploy('/api/rollback', 'Rollback');
+  });
+
+  loadConfig();
+</script>
+</body>
+</html>

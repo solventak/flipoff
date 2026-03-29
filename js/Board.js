@@ -4,6 +4,11 @@ import {
   TOTAL_TRANSITION, ACCENT_COLORS
 } from './constants.js';
 
+// Mutable runtime config — overridden by server config via applyConfig()
+let _staggerDelay = STAGGER_DELAY;
+let _totalTransition = TOTAL_TRANSITION;
+let _accentColors = ACCENT_COLORS;
+
 export class Board {
   constructor(containerEl, soundEngine) {
     this.cols = GRID_COLS;
@@ -73,6 +78,26 @@ export class Board {
 
     containerEl.appendChild(this.boardEl);
     this._updateAccentColors();
+    this._updateTileSize();
+
+    // Recompute tile size whenever the container or window resizes
+    this._resizeObserver = new ResizeObserver(() => this._updateTileSize());
+    this._resizeObserver.observe(this.boardEl);
+  }
+
+  _updateTileSize() {
+    const gap = parseInt(getComputedStyle(this.boardEl).getPropertyValue('--tile-gap')) || 4;
+    const paddingH = 96; // 48px left + 48px right padding
+    const paddingV = 68; // 28px top + 40px bottom padding
+
+    const availW = this.boardEl.clientWidth - paddingH;
+    const availH = this.boardEl.clientHeight - paddingV;
+
+    const tileW = Math.floor((availW - (this.cols - 1) * gap) / this.cols);
+    const tileH = Math.floor((availH - (this.rows - 1) * gap) / this.rows);
+
+    const tileSize = Math.max(24, Math.min(tileW, tileH));
+    this.boardEl.style.setProperty('--tile-size', `${tileSize}px`);
   }
 
   _createAccentBar(extraClass) {
@@ -87,8 +112,46 @@ export class Board {
     return bar;
   }
 
+  applyConfig(cfg) {
+    const { grid, timing, colors } = cfg;
+    _staggerDelay = timing.stagger_delay;
+    _totalTransition = timing.total_transition;
+    _accentColors = colors.accent_colors;
+
+    // Rebuild grid if dimensions changed
+    if (grid.cols !== this.cols || grid.rows !== this.rows) {
+      this.cols = grid.cols;
+      this.rows = grid.rows;
+      this.boardEl.style.setProperty('--grid-cols', this.cols);
+      this.boardEl.style.setProperty('--grid-rows', this.rows);
+      this._rebuildGrid();
+    }
+
+    this._updateAccentColors();
+    this._updateTileSize();
+  }
+
+  _rebuildGrid() {
+    this.gridEl.innerHTML = '';
+    this.tiles = [];
+    this.currentGrid = [];
+    for (let r = 0; r < this.rows; r++) {
+      const row = [];
+      const charRow = [];
+      for (let c = 0; c < this.cols; c++) {
+        const tile = new Tile(r, c);
+        tile.setChar(' ');
+        this.gridEl.appendChild(tile.el);
+        row.push(tile);
+        charRow.push(' ');
+      }
+      this.tiles.push(row);
+      this.currentGrid.push(charRow);
+    }
+  }
+
   _updateAccentColors() {
-    const color = ACCENT_COLORS[this.accentIndex % ACCENT_COLORS.length];
+    const color = _accentColors[this.accentIndex % _accentColors.length];
     const segments = this.boardEl.querySelectorAll('.accent-segment');
     segments.forEach(seg => {
       seg.style.backgroundColor = color;
@@ -111,7 +174,7 @@ export class Board {
         const oldChar = this.currentGrid[r][c];
 
         if (newChar !== oldChar) {
-          const delay = (r * this.cols + c) * STAGGER_DELAY;
+          const delay = (r * this.cols + c) * _staggerDelay;
           this.tiles[r][c].scrambleTo(newChar, delay);
           hasChanges = true;
         }
@@ -133,7 +196,7 @@ export class Board {
     // Clear transitioning flag after animation completes
     setTimeout(() => {
       this.isTransitioning = false;
-    }, TOTAL_TRANSITION + 200);
+    }, _totalTransition + 200);
   }
 
   _formatToGrid(lines) {

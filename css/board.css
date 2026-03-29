@@ -1,28 +1,28 @@
-/* Board Container */
+/* Board — fills the bezel entirely */
 .board {
-  --tile-size: clamp(36px, 4.2vw, 62px);
-  --tile-gap: clamp(3px, 0.3vw, 5px);
+  /* --tile-size set dynamically by Board.js */
+  --tile-gap: 4px;
 
   position: relative;
-  background: #1A1A1A;
-  border-radius: 16px;
-  padding: 28px 48px 40px;
   width: 100%;
-  box-shadow:
-    0 -4px 20px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  background: #1A1A1A;
+  padding: 28px 48px 40px;
   overflow: hidden;
 }
 
 /* Tile Grid */
 .tile-grid {
   display: grid;
-  grid-template-columns: repeat(var(--grid-cols, 22), var(--tile-size));
-  grid-template-rows: repeat(var(--grid-rows, 5), var(--tile-size));
+  grid-template-columns: repeat(var(--grid-cols, 16), var(--tile-size));
+  grid-template-rows: repeat(var(--grid-rows, 10), var(--tile-size));
   gap: var(--tile-gap);
   justify-content: center;
+  align-content: center;
+  height: 100%;
 }
 
-/* Accent Squares — small stacked blocks in top corners */
+/* Accent Squares */
 .accent-bar {
   position: absolute;
   top: 30px;
@@ -32,13 +32,8 @@
   z-index: 5;
 }
 
-.accent-bar-left {
-  left: 18px;
-}
-
-.accent-bar-right {
-  right: 18px;
-}
+.accent-bar-left { left: 18px; }
+.accent-bar-right { right: 18px; }
 
 .accent-segment {
   width: 14px;
@@ -86,9 +81,7 @@
   min-width: 180px;
 }
 
-.shortcuts-overlay.visible {
-  display: block;
-}
+.shortcuts-overlay.visible { display: block; }
 
 .shortcuts-overlay div {
   display: flex;
@@ -105,7 +98,7 @@
   margin-left: 16px;
 }
 
-/* Scroll indicator at bottom of board */
+/* Bottom pill */
 .board::after {
   content: '';
   position: absolute;

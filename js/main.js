@@ -2,6 +2,7 @@ import { Board } from './Board.js';
 import { SoundEngine } from './SoundEngine.js';
 import { MessageRotator } from './MessageRotator.js';
 import { KeyboardController } from './KeyboardController.js';
+import { configClient } from './config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const boardContainer = document.getElementById('board-container');
@@ -23,29 +24,29 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', initAudio);
   document.addEventListener('keydown', initAudio);
 
-  // Start message rotation
-  rotator.start();
+  // Apply config and react to live updates
+  configClient.onChange((cfg) => {
+    board.applyConfig(cfg);
+    rotator.applyConfig(cfg);
+  });
 
-  // Volume toggle button in header
-  const volumeBtn = document.getElementById('volume-btn');
-  if (volumeBtn) {
-    volumeBtn.addEventListener('click', () => {
-      initAudio();
-      const muted = soundEngine.toggleMute();
-      volumeBtn.classList.toggle('muted', muted);
-    });
-  }
+  // Temporary message: pause rotation and show immediately
+  configClient.onTempMessage((message) => {
+    rotator.pause();
+    board.displayMessage(message);
+  });
 
-  // "Get Early Access" button: scroll to board and go fullscreen
-  const ctaBtn = document.getElementById('cta-btn');
-  if (ctaBtn) {
-    ctaBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      initAudio();
-      boardContainer.scrollIntoView({ behavior: 'smooth' });
-      setTimeout(() => {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }, 400);
-    });
-  }
+  // Temp cleared: resume normal rotation
+  configClient.onTempClear(() => {
+    rotator.resume();
+  });
+
+  // Start rotation after first config arrives (WebSocket pushes on connect)
+  let started = false;
+  configClient.onChange(() => {
+    if (!started) {
+      started = true;
+      rotator.start();
+    }
+  });
 });
