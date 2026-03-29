@@ -317,8 +317,8 @@ export class Board {
     this._dirty = true;
   }
 
-  displayMessage(lines, scrambleRounds = 10, totalTransition = null) {
-    if (this.isTransitioning) return;
+  displayMessage(lines, scrambleRounds = 10, totalTransition = null, force = false) {
+    if (this.isTransitioning && !force) return;
     this.isTransitioning = true;
     this._animating      = true;
 

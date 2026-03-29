@@ -64,23 +64,29 @@ export class MessageRotator {
     this._scheduleNext();
   }
 
-  next() {
+  next(force = false) {
+    if (!this.messages.length) return;
     this.currentIndex = (this.currentIndex + 1) % this.messages.length;
-    this._showCurrent();
+    this._showCurrent(force);
+    if (force) {
+      // Manual nav: reset timer so auto-advance doesn't fire on top of us
+      this.stop();
+      this._scheduleNext();
+    }
   }
 
   prev() {
+    if (!this.messages.length) return;
     this.currentIndex = (this.currentIndex - 1 + this.messages.length) % this.messages.length;
-    this._showCurrent();
-    // Reset auto-advance timer
+    this._showCurrent(true);
     this.stop();
     this._scheduleNext();
   }
 
-  _showCurrent() {
+  _showCurrent(force = false) {
     const rounds = Math.round(clamp(resolveRange(this._scrambleRounds), 1, 50));
     const totalTransition = resolveRange(this._totalTransition);
-    this.board.displayMessage(this.messages[this.currentIndex], rounds, totalTransition);
+    this.board.displayMessage(this.messages[this.currentIndex], rounds, totalTransition, force);
   }
 
   _scheduleNext() {
@@ -91,8 +97,8 @@ export class MessageRotator {
     const delay = interval + totalTransition;
 
     this._timer = setTimeout(() => {
-      if (!this._paused && !this.board.isTransitioning) {
-        this.next();
+      if (!this._paused) {
+        this.next(); // force=false; board guard handles overlap
       }
       this._scheduleNext();
     }, delay);

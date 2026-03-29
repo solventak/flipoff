@@ -14,12 +14,12 @@ export class KeyboardController {
       case 'Enter':
       case ' ':
         e.preventDefault();
-        this.rotator.next();
+        this.rotator.next(true);
         break;
 
       case 'ArrowRight':
         e.preventDefault();
-        this.rotator.next();
+        this.rotator.next(true);
         break;
 
       case 'ArrowLeft':
