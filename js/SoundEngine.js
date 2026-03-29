@@ -46,7 +46,7 @@ export class SoundEngine {
     if (!this.ctx || !this._audioBuffer || this.muted) return;
     this.resume();
 
-    const MAX_VOICES = 4;
+    const MAX_VOICES = 8;
 
     // Pool full — skip rather than cut anything off
     if (this._voices.size >= MAX_VOICES) return;
