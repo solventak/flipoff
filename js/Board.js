@@ -1,69 +1,56 @@
-import { Tile } from './Tile.js';
 import {
-  GRID_COLS, GRID_ROWS, STAGGER_DELAY, SCRAMBLE_DURATION,
-  TOTAL_TRANSITION, ACCENT_COLORS
+  GRID_COLS, GRID_ROWS, STAGGER_DELAY, TOTAL_TRANSITION, ACCENT_COLORS
 } from './constants.js';
 
-// Mutable runtime config — overridden by server config via applyConfig()
-let _staggerDelay = STAGGER_DELAY;
-let _totalTransition = TOTAL_TRANSITION;
-let _accentColors = ACCENT_COLORS;
+const CHARSET         = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-!?\'/: ';
+const DEFAULT_SCRAMBLE_COLORS = ['#00AAFF', '#00FFCC', '#AA00FF', '#FF2D00', '#FFCC00', '#FFFFFF'];
+const TILE_BG         = '#222';
+const BOARD_BG        = '#1A1A1A';
+const TILE_GAP        = 4;
+const ACCENT_W        = 14;
+const ACCENT_H        = 14;
+const ACCENT_GAP      = 3;
+const SCRAMBLE_MS     = 70; // ms per scramble frame
+const PAD_LEFT        = 48;
+const PAD_RIGHT       = 48;
+const PAD_TOP         = 28;
+const PAD_BOTTOM      = 40;
 
 export class Board {
   constructor(containerEl, soundEngine) {
-    this.cols = GRID_COLS;
-    this.rows = GRID_ROWS;
-    this.soundEngine = soundEngine;
-    this.isTransitioning = false;
-    this.tiles = [];
-    this.currentGrid = [];
-    this.accentIndex = 0;
+    this.cols             = GRID_COLS;
+    this.rows             = GRID_ROWS;
+    this.soundEngine      = soundEngine;
+    this.isTransitioning  = false;
+    this.accentIndex      = 0;
 
-    // Build board DOM
-    this.boardEl = document.createElement('div');
-    this.boardEl.className = 'board';
-    this.boardEl.style.setProperty('--grid-cols', this.cols);
-    this.boardEl.style.setProperty('--grid-rows', this.rows);
+    // Runtime config (overridden by applyConfig)
+    this._staggerDelay    = STAGGER_DELAY;
+    this._totalTransition = TOTAL_TRANSITION;
+    this._accentColors    = [...ACCENT_COLORS];
+    this._scrambleColors  = [...DEFAULT_SCRAMBLE_COLORS];
 
-    // Left accent squares (2 small stacked blocks)
-    this.leftBar = this._createAccentBar('accent-bar-left');
-    this.boardEl.appendChild(this.leftBar);
+    // Board wrapper div (keeps keyboard hint + overlay as DOM)
+    this._boardEl = document.createElement('div');
+    this._boardEl.className = 'board';
 
-    // Tile grid
-    this.gridEl = document.createElement('div');
-    this.gridEl.className = 'tile-grid';
+    // Canvas — fills the board div
+    this._canvas = document.createElement('canvas');
+    this._canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
+    this._ctx = this._canvas.getContext('2d');
+    this._dpr = window.devicePixelRatio || 1;
+    this._boardEl.appendChild(this._canvas);
 
-    for (let r = 0; r < this.rows; r++) {
-      const row = [];
-      const charRow = [];
-      for (let c = 0; c < this.cols; c++) {
-        const tile = new Tile(r, c);
-        tile.setChar(' ');
-        this.gridEl.appendChild(tile.el);
-        row.push(tile);
-        charRow.push(' ');
-      }
-      this.tiles.push(row);
-      this.currentGrid.push(charRow);
-    }
-
-    this.boardEl.appendChild(this.gridEl);
-
-    // Right accent squares
-    this.rightBar = this._createAccentBar('accent-bar-right');
-    this.boardEl.appendChild(this.rightBar);
-
-    // Keyboard hint icon (bottom-left)
+    // Keyboard hint
     const hint = document.createElement('div');
     hint.className = 'keyboard-hint';
     hint.textContent = 'N';
     hint.title = 'Keyboard shortcuts';
     hint.addEventListener('click', (e) => {
       e.stopPropagation();
-      const overlay = this.boardEl.querySelector('.shortcuts-overlay');
-      if (overlay) overlay.classList.toggle('visible');
+      this._boardEl.querySelector('.shortcuts-overlay')?.classList.toggle('visible');
     });
-    this.boardEl.appendChild(hint);
+    this._boardEl.appendChild(hint);
 
     // Shortcuts overlay
     const overlay = document.createElement('div');
@@ -74,142 +61,302 @@ export class Board {
       <div><span>Fullscreen</span><kbd>F</kbd></div>
       <div><span>Mute</span><kbd>M</kbd></div>
     `;
-    this.boardEl.appendChild(overlay);
+    this._boardEl.appendChild(overlay);
 
-    containerEl.appendChild(this.boardEl);
-    this._updateAccentColors();
-    this._updateTileSize();
+    containerEl.appendChild(this._boardEl);
 
-    // Recompute tile size whenever the container or window resizes
-    this._resizeObserver = new ResizeObserver(() => this._updateTileSize());
-    this._resizeObserver.observe(this.boardEl);
+    // Cell state
+    this._cells      = this._createCells();
+    this._currentGrid = this._emptyGrid();
+
+    // Layout cache
+    this._tileSize = 32;
+    this._gridOffsetX = 0;
+    this._gridOffsetY = 0;
+    this._canvasW = 0;
+    this._canvasH = 0;
+
+    // RAF state
+    this._animating = false;
+    this._dirty     = true;
+
+    // Resize observer
+    this._ro = new ResizeObserver(() => this._onResize());
+    this._ro.observe(this._boardEl);
+    this._onResize();
+
+    // Start render loop
+    this._loop = this._loop.bind(this);
+    requestAnimationFrame(this._loop);
   }
 
-  _updateTileSize() {
-    const gap = parseInt(getComputedStyle(this.boardEl).getPropertyValue('--tile-gap')) || 4;
-    const paddingH = 96; // 48px left + 48px right padding
-    const paddingV = 68; // 28px top + 40px bottom padding
+  // -------------------------------------------------------------------------
+  // Cell helpers
+  // -------------------------------------------------------------------------
 
-    const availW = this.boardEl.clientWidth - paddingH;
-    const availH = this.boardEl.clientHeight - paddingV;
-
-    const tileW = Math.floor((availW - (this.cols - 1) * gap) / this.cols);
-    const tileH = Math.floor((availH - (this.rows - 1) * gap) / this.rows);
-
-    const tileSize = Math.max(24, Math.min(tileW, tileH));
-    this.boardEl.style.setProperty('--tile-size', `${tileSize}px`);
+  _createCells() {
+    return Array.from({ length: this.rows }, (_, r) =>
+      Array.from({ length: this.cols }, (_, c) => ({
+        r, c,
+        char:           ' ',
+        targetChar:     null,
+        displayChar:    ' ',
+        bgColor:        null,
+        maxFrames:      0,
+        startTime:      0,
+        lastFrame:      -1,
+        animating:      false,
+      }))
+    );
   }
 
-  _createAccentBar(extraClass) {
-    const bar = document.createElement('div');
-    bar.className = `accent-bar ${extraClass}`;
-    // Just 2 small stacked squares like the original
-    for (let i = 0; i < 2; i++) {
-      const seg = document.createElement('div');
-      seg.className = 'accent-segment';
-      bar.appendChild(seg);
+  _emptyGrid() {
+    return Array.from({ length: this.rows }, () => Array(this.cols).fill(' '));
+  }
+
+  // -------------------------------------------------------------------------
+  // Resize
+  // -------------------------------------------------------------------------
+
+  _onResize() {
+    const w = this._boardEl.clientWidth;
+    const h = this._boardEl.clientHeight;
+    if (!w || !h) return;
+
+    const dpr = this._dpr;
+    this._canvas.width  = Math.round(w * dpr);
+    this._canvas.height = Math.round(h * dpr);
+    this._canvasW = w;
+    this._canvasH = h;
+
+    const availW = w - PAD_LEFT - PAD_RIGHT;
+    const availH = h - PAD_TOP  - PAD_BOTTOM;
+
+    const tileW = Math.floor((availW - (this.cols - 1) * TILE_GAP) / this.cols);
+    const tileH = Math.floor((availH - (this.rows  - 1) * TILE_GAP) / this.rows);
+    this._tileSize = Math.max(16, Math.min(tileW, tileH));
+
+    const gridW = this.cols * this._tileSize + (this.cols - 1) * TILE_GAP;
+    const gridH = this.rows * this._tileSize + (this.rows  - 1) * TILE_GAP;
+    this._gridOffsetX = PAD_LEFT  + Math.floor((availW - gridW) / 2);
+    this._gridOffsetY = PAD_TOP   + Math.floor((availH - gridH) / 2);
+
+    this._dirty = true;
+  }
+
+  // -------------------------------------------------------------------------
+  // RAF loop
+  // -------------------------------------------------------------------------
+
+  _loop(now) {
+    requestAnimationFrame(this._loop);
+
+    if (!this._animating && !this._dirty) return;
+
+    let stillAnimating = false;
+    let frameDirty = this._dirty;
+
+    if (this._animating) {
+      for (let r = 0; r < this.rows; r++) {
+        for (let c = 0; c < this.cols; c++) {
+          const cell = this._cells[r][c];
+          if (!cell.animating) continue;
+
+          if (now < cell.startTime) {
+            stillAnimating = true;
+            continue;
+          }
+
+          const frameIndex = Math.floor((now - cell.startTime) / SCRAMBLE_MS);
+
+          if (frameIndex < cell.maxFrames) {
+            // Only update if we've moved to a new scramble frame
+            if (frameIndex !== cell.lastFrame) {
+              cell.lastFrame   = frameIndex;
+              cell.displayChar = CHARSET[Math.floor(Math.random() * CHARSET.length)];
+              cell.bgColor     = this._scrambleColors[frameIndex % this._scrambleColors.length];
+              frameDirty = true;
+            }
+            stillAnimating = true;
+          } else {
+            // Settle
+            cell.char        = cell.targetChar;
+            cell.displayChar = cell.targetChar;
+            cell.bgColor     = null;
+            cell.animating   = false;
+            cell.targetChar  = null;
+            frameDirty = true;
+          }
+        }
+      }
     }
-    return bar;
+
+    if (!stillAnimating) this._animating = false;
+
+    if (frameDirty) {
+      this._draw();
+      this._dirty = false;
+    }
   }
+
+  // -------------------------------------------------------------------------
+  // Draw
+  // -------------------------------------------------------------------------
+
+  _draw() {
+    const ctx  = this._ctx;
+    const dpr  = this._dpr;
+    const w    = this._canvasW;
+    const h    = this._canvasH;
+    const ts   = this._tileSize;
+    const ox   = this._gridOffsetX;
+    const oy   = this._gridOffsetY;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Board background
+    ctx.fillStyle = BOARD_BG;
+    ctx.fillRect(0, 0, w, h);
+
+    // Accent bars
+    const accentColor = this._accentColors[this.accentIndex % this._accentColors.length];
+    ctx.fillStyle = accentColor;
+    for (let i = 0; i < 2; i++) {
+      this._rr(ctx, 18,         30 + i * (ACCENT_H + ACCENT_GAP), ACCENT_W, ACCENT_H, 2);
+      this._rr(ctx, w - 18 - ACCENT_W, 30 + i * (ACCENT_H + ACCENT_GAP), ACCENT_W, ACCENT_H, 2);
+    }
+
+    // Bottom pill
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    this._rr(ctx, w / 2 - 20, h - 16, 40, 4, 2);
+
+    // Tiles
+    const fontSize = Math.max(8, Math.floor(ts * 0.52));
+    ctx.font         = `700 ${fontSize}px "Helvetica Neue",Helvetica,Arial,sans-serif`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const cell = this._cells[r][c];
+        const x = ox + c * (ts + TILE_GAP);
+        const y = oy + r * (ts + TILE_GAP);
+
+        // Outer shadow strip
+        ctx.fillStyle = '#111';
+        this._rr(ctx, x, y, ts, ts, 3);
+
+        // Tile face
+        ctx.fillStyle = cell.bgColor || TILE_BG;
+        this._rr(ctx, x + 1, y + 1, ts - 2, ts - 2, 2);
+
+        // Split line
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(x + 1, y + (ts >> 1), ts - 2, 1);
+
+        // Character
+        if (cell.displayChar && cell.displayChar !== ' ') {
+          const light = cell.bgColor === '#FFFFFF' || cell.bgColor === '#FFCC00';
+          ctx.fillStyle = light ? '#111' : '#FFFFFF';
+          ctx.fillText(cell.displayChar, x + (ts >> 1), y + (ts >> 1) + 1);
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /** Convenience: filled rounded rect (with fallback for older Chromium on Pi) */
+  _rr(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      // Fallback: manual arc-based rounded rect
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.arcTo(x + w, y,     x + w, y + r,     r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+      ctx.lineTo(x + r, y + h);
+      ctx.arcTo(x,     y + h, x,     y + h - r, r);
+      ctx.lineTo(x,     y + r);
+      ctx.arcTo(x,     y,     x + r, y,         r);
+      ctx.closePath();
+    }
+    ctx.fill();
+  }
+
+  // -------------------------------------------------------------------------
+  // Public API
+  // -------------------------------------------------------------------------
 
   applyConfig(cfg) {
     const { grid, timing, colors } = cfg;
-    _staggerDelay = timing.stagger_delay;
-    _totalTransition = timing.total_transition;
-    _accentColors = colors.accent_colors;
+    this._staggerDelay    = timing.stagger_delay;
+    this._totalTransition = timing.total_transition;
+    this._accentColors    = colors.accent_colors;
+    this._scrambleColors  = colors.scramble_colors;
 
-    // Rebuild grid if dimensions changed
     if (grid.cols !== this.cols || grid.rows !== this.rows) {
       this.cols = grid.cols;
       this.rows = grid.rows;
-      this.boardEl.style.setProperty('--grid-cols', this.cols);
-      this.boardEl.style.setProperty('--grid-rows', this.rows);
-      this._rebuildGrid();
+      this._cells       = this._createCells();
+      this._currentGrid = this._emptyGrid();
+      this._onResize();
     }
 
-    this._updateAccentColors();
-    this._updateTileSize();
-  }
-
-  _rebuildGrid() {
-    this.gridEl.innerHTML = '';
-    this.tiles = [];
-    this.currentGrid = [];
-    for (let r = 0; r < this.rows; r++) {
-      const row = [];
-      const charRow = [];
-      for (let c = 0; c < this.cols; c++) {
-        const tile = new Tile(r, c);
-        tile.setChar(' ');
-        this.gridEl.appendChild(tile.el);
-        row.push(tile);
-        charRow.push(' ');
-      }
-      this.tiles.push(row);
-      this.currentGrid.push(charRow);
-    }
-  }
-
-  _updateAccentColors() {
-    const color = _accentColors[this.accentIndex % _accentColors.length];
-    const segments = this.boardEl.querySelectorAll('.accent-segment');
-    segments.forEach(seg => {
-      seg.style.backgroundColor = color;
-    });
+    this._dirty = true;
   }
 
   displayMessage(lines, scrambleRounds = 10, totalTransition = null) {
     if (this.isTransitioning) return;
     this.isTransitioning = true;
+    this._animating      = true;
 
-    const effectiveTotalTransition = totalTransition ?? _totalTransition;
+    // Resolve totalTransition (may be a range object — use whichever was resolved)
+    const ttMs = totalTransition ?? (
+      typeof this._totalTransition === 'object'
+        ? this._totalTransition.max
+        : this._totalTransition
+    );
 
-    // Format lines into grid
     const newGrid = this._formatToGrid(lines);
-
-    // Determine which tiles need to change
+    const now     = performance.now();
     let hasChanges = false;
 
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const newChar = newGrid[r][c];
-        const oldChar = this.currentGrid[r][c];
+        if (newChar === this._currentGrid[r][c]) continue;
 
-        if (newChar !== oldChar) {
-          const delay = (r * this.cols + c) * _staggerDelay;
-          this.tiles[r][c].scrambleTo(newChar, delay, scrambleRounds);
-          hasChanges = true;
-        }
+        const cell       = this._cells[r][c];
+        cell.targetChar  = newChar;
+        cell.maxFrames   = Math.max(1, Math.min(50, Math.round(scrambleRounds)));
+        cell.startTime   = now + (r * this.cols + c) * this._staggerDelay;
+        cell.lastFrame   = -1;
+        cell.animating   = true;
+        hasChanges = true;
       }
     }
 
-    // Play the single transition audio clip once
-    if (hasChanges && this.soundEngine) {
-      this.soundEngine.playTransition();
-    }
+    if (hasChanges && this.soundEngine) this.soundEngine.playTransition();
 
-    // Update accent bar colors
     this.accentIndex++;
-    this._updateAccentColors();
+    this._currentGrid = newGrid;
 
-    // Update grid state
-    this.currentGrid = newGrid;
-
-    // Clear transitioning flag after animation completes
     setTimeout(() => {
       this.isTransitioning = false;
-    }, effectiveTotalTransition + 200);
+    }, ttMs + 200);
   }
 
   _formatToGrid(lines) {
-    const grid = [];
-    for (let r = 0; r < this.rows; r++) {
+    return Array.from({ length: this.rows }, (_, r) => {
       const line = (lines[r] || '').toUpperCase();
-      const padTotal = this.cols - line.length;
-      const padLeft = Math.max(0, Math.floor(padTotal / 2));
-      const padded = ' '.repeat(padLeft) + line + ' '.repeat(Math.max(0, this.cols - padLeft - line.length));
-      grid.push(padded.split(''));
-    }
-    return grid;
+      const pad  = this.cols - line.length;
+      const pl   = Math.max(0, Math.floor(pad / 2));
+      return (' '.repeat(pl) + line).padEnd(this.cols, ' ').slice(0, this.cols).split('');
+    });
   }
 }
