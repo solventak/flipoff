@@ -1,6 +1,6 @@
 import { FLAP_AUDIO_BASE64 } from './flapAudio.js';
 
-const MAX_VOICES = 8;
+const MAX_VOICES = 32;
 
 export class SoundEngine {
   constructor() {
