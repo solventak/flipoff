@@ -76,14 +76,15 @@ export class SoundEngine {
     if (this._voices.size >= MAX_VOICES) return;
 
     const t      = this.ctx.currentTime;
+    const jitter = Math.random() * 0.04; // 0–40ms random offset
     const source = this.ctx.createBufferSource();
     source.buffer = this._audioBuffer;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.7, t);
+    gain.gain.setValueAtTime(0.7, t + jitter);
     source.connect(gain);
     gain.connect(this.ctx.destination);
-    source.start(0);
+    source.start(t + jitter);
 
     this._voices.add(source);
     source.onended = () => this._voices.delete(source);
