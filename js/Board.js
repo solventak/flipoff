@@ -5,6 +5,7 @@ import {
 const CHARSET         = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-!?\'/: ';
 const DEFAULT_SCRAMBLE_COLORS = ['#00AAFF', '#00FFCC', '#AA00FF', '#FF2D00', '#FFCC00', '#FFFFFF'];
 const TILE_BG         = '#222';
+const STATUS_BG       = '#1A1A1A'; // status row bg — blends into board, char only
 const BOARD_BG        = '#1A1A1A';
 const TILE_GAP        = 4;
 const ACCENT_W        = 14;
@@ -268,7 +269,7 @@ export class Board {
         // Character
         if (cell.displayChar && cell.displayChar !== ' ') {
           const light = cell.bgColor === '#FFFFFF' || cell.bgColor === '#FFCC00';
-          ctx.fillStyle = light ? '#111' : '#FFFFFF';
+          ctx.fillStyle = light ? '#111' : (cell.isStatus ? 'rgba(255,255,255,0.45)' : '#FFFFFF');
           ctx.fillText(cell.displayChar, x + (ts >> 1), y + (ts >> 1) + 1);
         }
       }
@@ -362,11 +363,32 @@ export class Board {
   }
 
   _formatToGrid(lines) {
+    // Only fill rows 0..(rows-2); bottom row is reserved for status bar
+    const contentRows = this.rows - 1;
     return Array.from({ length: this.rows }, (_, r) => {
+      if (r >= contentRows) return Array(this.cols).fill(' '); // leave status row alone
       const line = (lines[r] || '').toUpperCase();
       const pad  = this.cols - line.length;
       const pl   = Math.max(0, Math.floor(pad / 2));
       return (' '.repeat(pl) + line).padEnd(this.cols, ' ').slice(0, this.cols).split('');
     });
+  }
+
+  /**
+   * Set the bottom row directly — no scramble animation, dimmer style.
+   * Called every second by StatusBar.
+   */
+  setStatusRow(text) {
+    const r    = this.rows - 1;
+    const chars = text.toUpperCase().padEnd(this.cols, ' ').slice(0, this.cols).split('');
+    for (let c = 0; c < this.cols; c++) {
+      const cell = this._cells[r][c];
+      cell.char        = chars[c];
+      cell.displayChar = chars[c];
+      cell.bgColor     = null;
+      cell.animating   = false;
+      cell.isStatus    = true; // flag for dimmer rendering
+    }
+    this._dirty = true;
   }
 }
