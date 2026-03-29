@@ -393,13 +393,6 @@
       <span class="hint">ms per tile</span>
     </div>
     <div class="row">
-      <label>Total transition</label>
-      <input type="number" id="timing-total-min" min="0" step="100" value="3800">
-      <span class="hint">–</span>
-      <input type="number" id="timing-total-max" min="0" step="100" value="3800">
-      <span class="hint">ms (set equal for fixed)</span>
-    </div>
-    <div class="row">
       <label>Message interval</label>
       <input type="number" id="timing-interval-min" min="0" step="500" value="4000">
       <span class="hint">–</span>
@@ -491,7 +484,6 @@
       document.getElementById(`${baseId}-min`).value = isRange ? value.min : value;
       document.getElementById(`${baseId}-max`).value = isRange ? value.max : value;
     };
-    setRange('timing-total', config.timing.total_transition);
     setRange('timing-interval', config.timing.message_interval);
     setRange('timing-scramble-rounds', config.timing.scramble_rounds ?? 10);
 
@@ -619,7 +611,6 @@
         scramble_duration: parseInt(document.getElementById('timing-scramble').value),
         flip_duration: parseInt(document.getElementById('timing-flip').value),
         stagger_delay: parseInt(document.getElementById('timing-stagger').value),
-        ...collectRange('timing-total', 'total_transition'),
         ...collectRange('timing-interval', 'message_interval'),
         ...collectRange('timing-scramble-rounds', 'scramble_rounds'),
         temp_message_duration: parseInt(document.getElementById('timing-temp-duration').value),

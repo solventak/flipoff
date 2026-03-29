@@ -1,4 +1,4 @@
-import { MESSAGES, MESSAGE_INTERVAL, TOTAL_TRANSITION } from './constants.js';
+import { MESSAGES, MESSAGE_INTERVAL } from './constants.js';
 
 function resolveRange(value) {
   if (value !== null && typeof value === 'object' && 'min' in value && 'max' in value) {
@@ -7,51 +7,34 @@ function resolveRange(value) {
   return value;
 }
 
-function clamp(val, min, max) {
-  return Math.max(min, Math.min(max, val));
-}
-
 export class MessageRotator {
   constructor(board) {
-    this.board = board;
-    this.messages = MESSAGES;
-    this.currentIndex = -1;
-    this._timer = null;
-    this._paused = false;
-
-    // These can be numbers or { min, max } objects
+    this.board            = board;
+    this.messages         = MESSAGES;
+    this.currentIndex     = -1;
+    this._timer           = null;
+    this._paused          = false;
     this._messageInterval = MESSAGE_INTERVAL;
-    this._totalTransition = TOTAL_TRANSITION;
-    this._scrambleRounds = 10;
+    this._scrambleRounds  = 10; // number or { min, max }
+    this._lastDuration    = 0;  // actual transition duration from last displayMessage call
   }
 
   applyConfig(cfg) {
     this._messageInterval = cfg.timing.message_interval;
-    this._totalTransition = cfg.timing.total_transition;
-    this._scrambleRounds = cfg.timing.scramble_rounds ?? 10;
-    this.messages = cfg.messages;
+    this._scrambleRounds  = cfg.timing.scramble_rounds ?? 10;
+    this.messages         = cfg.messages;
 
-    if (this.currentIndex >= this.messages.length) {
-      this.currentIndex = 0;
-    }
-
-    // Restart if already running
-    if (this._timer) {
-      this.stop();
-      this.start();
-    }
+    if (this.currentIndex >= this.messages.length) this.currentIndex = 0;
+    if (this._timer) { this.stop(); this.start(); }
   }
 
   start() {
-    this.next();
-    this._scheduleNext();
+    this._lastDuration = this._showCurrent(false);
+    this._scheduleNext(this._lastDuration);
   }
 
   stop() {
-    if (this._timer) {
-      clearTimeout(this._timer);
-      this._timer = null;
-    }
+    if (this._timer) { clearTimeout(this._timer); this._timer = null; }
   }
 
   pause() {
@@ -61,46 +44,44 @@ export class MessageRotator {
 
   resume() {
     this._paused = false;
-    this._scheduleNext();
+    this._scheduleNext(this._lastDuration);
   }
 
   next(force = false) {
     if (!this.messages.length) return;
-    this.currentIndex = (this.currentIndex + 1) % this.messages.length;
-    this._showCurrent(force);
-    if (force) {
-      // Manual nav: reset timer so auto-advance doesn't fire on top of us
-      this.stop();
-      this._scheduleNext();
-    }
+    this.currentIndex  = (this.currentIndex + 1) % this.messages.length;
+    this._lastDuration = this._showCurrent(force);
+    if (force) { this.stop(); this._scheduleNext(this._lastDuration); }
   }
 
   prev() {
     if (!this.messages.length) return;
-    this.currentIndex = (this.currentIndex - 1 + this.messages.length) % this.messages.length;
-    this._showCurrent(true);
+    this.currentIndex  = (this.currentIndex - 1 + this.messages.length) % this.messages.length;
+    this._lastDuration = this._showCurrent(true);
     this.stop();
-    this._scheduleNext();
+    this._scheduleNext(this._lastDuration);
   }
 
+  /** Show current message. Returns computed transition duration (ms). */
   _showCurrent(force = false) {
-    const rounds = Math.round(clamp(resolveRange(this._scrambleRounds), 1, 50));
-    const totalTransition = resolveRange(this._totalTransition);
-    this.board.displayMessage(this.messages[this.currentIndex], rounds, totalTransition, force);
+    return this.board.displayMessage(
+      this.messages[this.currentIndex],
+      this._scrambleRounds,
+      force
+    );
   }
 
-  _scheduleNext() {
+  _scheduleNext(transitionDuration = 0) {
     if (this._paused) return;
-
     const interval = resolveRange(this._messageInterval);
-    const totalTransition = resolveRange(this._totalTransition);
-    const delay = interval + totalTransition;
+    const delay    = transitionDuration + interval;
 
     this._timer = setTimeout(() => {
       if (!this._paused) {
-        this.next(); // force=false; board guard handles overlap
+        this.currentIndex  = (this.currentIndex + 1) % this.messages.length;
+        this._lastDuration = this._showCurrent(false);
       }
-      this._scheduleNext();
+      this._scheduleNext(this._lastDuration);
     }, delay);
   }
 }

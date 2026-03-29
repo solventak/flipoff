@@ -65,8 +65,7 @@ class TimingConfig(BaseModel):
     scramble_duration: int = Field(800, description="Total scramble animation duration (ms)")
     flip_duration: int = Field(300, description="Duration of each individual tile flip (ms)")
     stagger_delay: int = Field(25, description="Delay between each tile starting its flip (ms)")
-    total_transition: RangeOrInt = Field(3800, description="Total transition duration (ms). Fixed int or {min, max} for random range per message.")
-    message_interval: RangeOrInt = Field(4000, description="Time between messages (ms). Fixed int or {min, max} for random range per message.")
+    message_interval: RangeOrInt = Field(4000, description="Time to show a settled message before the next transition (ms). Fixed int or {min, max} for random range.")
     scramble_rounds: RangeOrInt = Field(10, description="Scramble cycles per tile (1–50). Fixed int or {min, max} for random range per message.")
     temp_message_duration: int = Field(30, description="Default duration (seconds) for temporary messages before reverting")
 

@@ -1,5 +1,5 @@
 import {
-  GRID_COLS, GRID_ROWS, STAGGER_DELAY, TOTAL_TRANSITION, ACCENT_COLORS
+  GRID_COLS, GRID_ROWS, STAGGER_DELAY, ACCENT_COLORS
 } from './constants.js';
 
 const CHARSET         = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-!?\'/: ';
@@ -26,10 +26,9 @@ export class Board {
     this.accentIndex      = 0;
 
     // Runtime config (overridden by applyConfig)
-    this._staggerDelay    = STAGGER_DELAY;
-    this._totalTransition = TOTAL_TRANSITION;
-    this._accentColors    = [...ACCENT_COLORS];
-    this._scrambleColors  = [...DEFAULT_SCRAMBLE_COLORS];
+    this._staggerDelay   = STAGGER_DELAY;
+    this._accentColors   = [...ACCENT_COLORS];
+    this._scrambleColors = [...DEFAULT_SCRAMBLE_COLORS];
 
     // Board wrapper div (keeps keyboard hint + overlay as DOM)
     this._boardEl = document.createElement('div');
@@ -305,9 +304,8 @@ export class Board {
 
   applyConfig(cfg) {
     const { grid, timing, colors } = cfg;
-    this._staggerDelay    = timing.stagger_delay;
-    this._totalTransition = timing.total_transition;
-    this._accentColors    = colors.accent_colors;
+    this._staggerDelay   = timing.stagger_delay;
+    this._accentColors   = colors.accent_colors;
     this._scrambleColors  = colors.scramble_colors;
 
     if (grid.cols !== this.cols || grid.rows !== this.rows) {
@@ -321,45 +319,55 @@ export class Board {
     this._dirty = true;
   }
 
-  displayMessage(lines, scrambleRounds = 10, totalTransition = null, force = false) {
-    if (this.isTransitioning && !force) return;
+  /**
+   * Display a message. Each changing tile gets a random start delay within
+   * the stagger window and a random number of scramble rounds. Transition
+   * duration is computed from actual tile timings — no fixed duration needed.
+   */
+  displayMessage(lines, scrambleRounds = 10, force = false) {
+    if (this.isTransitioning && !force) return 0;
     this.isTransitioning = true;
     this._animating      = true;
 
-    // Resolve totalTransition (may be a range object — use whichever was resolved)
-    const ttMs = totalTransition ?? (
-      typeof this._totalTransition === 'object'
-        ? this._totalTransition.max
-        : this._totalTransition
-    );
-
-    const newGrid = this._formatToGrid(lines);
-    const now     = performance.now();
-    let hasChanges = false;
+    const newGrid    = this._formatToGrid(lines);
+    const now        = performance.now();
+    let hasChanges   = false;
+    let maxEndOffset = 0; // ms from now until the last tile finishes
 
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const newChar = newGrid[r][c];
         if (newChar === this._currentGrid[r][c]) continue;
 
-        const cell       = this._cells[r][c];
-        cell.targetChar  = newChar;
-        cell.maxFrames   = Math.max(1, Math.min(50, Math.round(scrambleRounds)));
-        cell.startTime   = now + (r * this.cols + c) * this._staggerDelay;
-        cell.lastFrame   = -1;
-        cell.animating   = true;
+        // Random delay within stagger window
+        const delay = Math.random() * this._staggerDelay;
+
+        // Random rounds within configured range
+        const rounds = Math.max(1, Math.min(50, Math.round(
+          typeof scrambleRounds === 'object'
+            ? scrambleRounds.min + Math.random() * (scrambleRounds.max - scrambleRounds.min)
+            : scrambleRounds
+        )));
+
+        const cell      = this._cells[r][c];
+        cell.targetChar = newChar;
+        cell.maxFrames  = rounds;
+        cell.startTime  = now + delay;
+        cell.lastFrame  = -1;
+        cell.animating  = true;
         hasChanges = true;
+
+        const endOffset = delay + rounds * SCRAMBLE_MS;
+        if (endOffset > maxEndOffset) maxEndOffset = endOffset;
       }
     }
-
-    // Sound is now driven per-frame in the RAF loop via playClick()
 
     this.accentIndex++;
     this._currentGrid = newGrid;
 
-    setTimeout(() => {
-      this.isTransitioning = false;
-    }, ttMs + 200);
+    const duration = maxEndOffset + 200; // 200ms settle buffer
+    setTimeout(() => { this.isTransitioning = false; }, duration);
+    return duration;
   }
 
   _formatToGrid(lines) {
