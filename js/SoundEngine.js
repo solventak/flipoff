@@ -67,6 +67,16 @@ export class SoundEngine {
     source.onended = () => this._voices.delete(source);
   }
 
+  /** Fade out and stop all active voices — call when animation finishes */
+  stopAll() {
+    for (const source of this._voices) {
+      try {
+        source.stop(this.ctx.currentTime + 0.1); // 100ms fade-to-stop
+      } catch (e) {}
+    }
+    // _voices cleans itself via onended callbacks
+  }
+
   // Keep for API compat
   playTransition() {
     this.playClick();

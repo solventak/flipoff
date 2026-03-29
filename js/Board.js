@@ -198,7 +198,10 @@ export class Board {
       }
     }
 
-    if (!stillAnimating) this._animating = false;
+    if (!stillAnimating && this._animating) {
+      this._animating = false;
+      if (this.soundEngine) this.soundEngine.stopAll();
+    }
 
     if (frameDirty) {
       this._draw();
