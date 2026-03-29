@@ -1,36 +1,68 @@
 import { FLAP_AUDIO_BASE64 } from './flapAudio.js';
 
+const MAX_VOICES = 8;
+
 export class SoundEngine {
   constructor() {
-    this.ctx = null;
-    this.muted = false;
-    this._initialized = false;
-    this._audioBuffer = null;
-    this._voices = new Set(); // active playback pool (max 4)
+    this.ctx            = null;
+    this.muted          = false;
+    this._initialized   = false;
+    this._audioBuffer   = null;
+    this._voices        = new Set();
+    this._activeSound   = 'default'; // 'default' = built-in base64
+    this._loading       = false;
   }
 
   async init() {
     if (this._initialized) return;
-    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.ctx          = new (window.AudioContext || window.webkitAudioContext)();
     this._initialized = true;
+    await this._loadBuiltin();
+  }
 
-    // Decode the embedded audio clip
+  async _loadBuiltin() {
     try {
       const binaryStr = atob(FLAP_AUDIO_BASE64);
-      const bytes = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i);
-      }
+      const bytes     = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
       this._audioBuffer = await this.ctx.decodeAudioData(bytes.buffer);
     } catch (e) {
-      console.warn('Failed to decode flap audio:', e);
+      console.warn('Failed to decode built-in flap audio:', e);
+    }
+  }
+
+  async _loadFromUrl(url) {
+    if (!this.ctx) return;
+    this._loading = true;
+    try {
+      const res    = await fetch(url);
+      const buf    = await res.arrayBuffer();
+      this._audioBuffer = await this.ctx.decodeAudioData(buf);
+    } catch (e) {
+      console.warn('Failed to load sound from URL, falling back to built-in:', e);
+      await this._loadBuiltin();
+    } finally {
+      this._loading = false;
+    }
+  }
+
+  /**
+   * Switch to a different sound. Called when the server broadcasts sound_changed.
+   * @param {string} name - sound name, or 'default' for built-in
+   */
+  async setActiveSound(name) {
+    this._activeSound = name;
+    this.stopAll();
+    if (!this._initialized) return; // will load on init()
+    if (name === 'default') {
+      await this._loadBuiltin();
+    } else {
+      await this._loadFromUrl(`/api/sounds/${encodeURIComponent(name)}/file`);
     }
   }
 
   resume() {
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
-    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
   }
 
   toggleMute() {
@@ -38,17 +70,9 @@ export class SoundEngine {
     return this.muted;
   }
 
-  /**
-   * Play the full clip as a click. At most MAX_VOICES play simultaneously —
-   * if the pool is full, the click is skipped (no cutoff, no overlap pile-up).
-   */
   playClick() {
-    if (!this.ctx || !this._audioBuffer || this.muted) return;
+    if (!this.ctx || !this._audioBuffer || this.muted || this._loading) return;
     this.resume();
-
-    const MAX_VOICES = 4;
-
-    // Pool full — skip rather than cut anything off
     if (this._voices.size >= MAX_VOICES) return;
 
     const t      = this.ctx.currentTime;
@@ -57,41 +81,24 @@ export class SoundEngine {
 
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0.7, t);
-
     source.connect(gain);
     gain.connect(this.ctx.destination);
-
     source.start(0);
 
     this._voices.add(source);
     source.onended = () => this._voices.delete(source);
   }
 
-  /** Fade out and stop all active voices — call when animation finishes */
   stopAll() {
     for (const source of this._voices) {
-      try {
-        source.stop(this.ctx.currentTime + 0.1); // 100ms fade-to-stop
-      } catch (e) {}
+      try { source.stop(this.ctx?.currentTime + 0.05); } catch (e) {}
     }
-    // _voices cleans itself via onended callbacks
   }
 
-  // Keep for API compat
-  playTransition() {
-    this.playClick();
-  }
-
-  /** Get the duration of the transition audio clip in ms */
+  // Compat aliases
+  playTransition() { this.playClick(); }
+  scheduleFlaps()  { this.playClick(); }
   getTransitionDuration() {
-    if (this._audioBuffer) {
-      return this._audioBuffer.duration * 1000;
-    }
-    return 3800; // fallback
-  }
-
-  // Keep this for API compatibility but it now plays the full transition
-  scheduleFlaps() {
-    this.playTransition();
+    return this._audioBuffer ? this._audioBuffer.duration * 1000 : 3800;
   }
 }

@@ -26,9 +26,10 @@ const DEFAULT_CONFIG = {
 class ConfigClient {
   constructor() {
     this._config = structuredClone(DEFAULT_CONFIG);
-    this._listeners = [];
-    this._tempListeners = [];
-    this._tempClearListeners = [];
+    this._listeners            = [];
+    this._tempListeners        = [];
+    this._tempClearListeners   = [];
+    this._soundChangedListeners = [];
     this._ws = null;
     this._reconnectDelay = 1000;
     this._connect();
@@ -50,6 +51,10 @@ class ConfigClient {
     this._tempClearListeners.push(fn);
   }
 
+  onSoundChanged(fn) {
+    this._soundChangedListeners.push(fn);
+  }
+
   _notify() {
     for (const fn of this._listeners) fn(this._config);
   }
@@ -60,6 +65,10 @@ class ConfigClient {
 
   _notifyTempClear() {
     for (const fn of this._tempClearListeners) fn();
+  }
+
+  _notifySoundChanged(name) {
+    for (const fn of this._soundChangedListeners) fn(name);
   }
 
   _connect() {
@@ -77,6 +86,8 @@ class ConfigClient {
           this._notifyTemp(msg.data.message);
         } else if (msg.type === 'temp_clear') {
           this._notifyTempClear();
+        } else if (msg.type === 'sound_changed') {
+          this._notifySoundChanged(msg.data.name);
         }
       } catch {}
     });

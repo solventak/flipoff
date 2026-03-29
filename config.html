@@ -438,6 +438,18 @@
     <button class="add-message" id="add-message" style="margin-top: 12px;">+ Add message</button>
   </div>
 
+  <!-- Sounds -->
+  <div class="section">
+    <h2>Sounds</h2>
+    <div id="sounds-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;"></div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <label style="font-size:14px;font-weight:500;color:#333;">Upload sound</label>
+      <input type="file" id="sound-upload" accept=".mp3,.wav,.ogg,.m4a,.flac" style="font-size:13px;">
+      <button class="save-btn" id="sound-upload-btn" style="padding:8px 18px;font-size:13px;">Upload</button>
+      <span class="save-status" id="sound-upload-status"></span>
+    </div>
+  </div>
+
   <!-- Software -->
   <div class="section">
     <h2>Software</h2>
@@ -645,6 +657,115 @@
     }
   }
 
+  // ---- Sounds ----
+  let _previewCtx = null;
+
+  async function loadSounds() {
+    const res    = await fetch('/api/sounds');
+    const sounds = await res.json();
+    const list   = document.getElementById('sounds-list');
+    list.innerHTML = '';
+
+    for (const s of sounds) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;background:#F8F8F8;border-radius:8px;border:1.5px solid ' + (s.active ? '#111' : '#E8E8E8');
+
+      const name = document.createElement('span');
+      name.style.cssText = 'flex:1;font-size:14px;font-weight:' + (s.active ? '700' : '500') + ';color:#333;';
+      name.textContent   = s.name + (s.builtin ? ' (built-in)' : '') + (s.active ? ' ✓' : '');
+      row.appendChild(name);
+
+      // Preview button
+      const previewBtn = document.createElement('button');
+      previewBtn.className   = 'deploy-btn primary';
+      previewBtn.style.cssText = 'padding:6px 14px;font-size:12px;';
+      previewBtn.textContent = '▶ Preview';
+      previewBtn.addEventListener('click', async () => {
+        if (!_previewCtx) _previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (_previewCtx.state === 'suspended') await _previewCtx.resume();
+
+        let buffer;
+        if (s.builtin) {
+          const { FLAP_AUDIO_BASE64 } = await import('./js/flapAudio.js');
+          const bin   = atob(FLAP_AUDIO_BASE64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          buffer = await _previewCtx.decodeAudioData(bytes.buffer);
+        } else {
+          const res = await fetch(`/api/sounds/${encodeURIComponent(s.name)}/file`);
+          buffer    = await _previewCtx.decodeAudioData(await res.arrayBuffer());
+        }
+        const src = _previewCtx.createBufferSource();
+        src.buffer = buffer;
+        src.connect(_previewCtx.destination);
+        src.start(0);
+        src.stop(_previewCtx.currentTime + Math.min(2, buffer.duration));
+      });
+      row.appendChild(previewBtn);
+
+      // Set active button (skip if already active)
+      if (!s.active) {
+        const setBtn = document.createElement('button');
+        setBtn.className     = 'deploy-btn primary';
+        setBtn.style.cssText = 'padding:6px 14px;font-size:12px;background:#00AA55;';
+        setBtn.textContent   = 'Set active';
+        setBtn.addEventListener('click', async () => {
+          await fetch('/api/sounds/active', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: s.name }),
+          });
+          loadSounds();
+        });
+        row.appendChild(setBtn);
+      }
+
+      // Delete button (uploaded only)
+      if (!s.builtin) {
+        const delBtn = document.createElement('button');
+        delBtn.className     = 'clear-btn';
+        delBtn.style.cssText = 'padding:6px 12px;font-size:12px;';
+        delBtn.textContent   = '✕';
+        delBtn.addEventListener('click', async () => {
+          if (!confirm(`Delete "${s.name}"?`)) return;
+          await fetch(`/api/sounds/${encodeURIComponent(s.name)}`, { method: 'DELETE' });
+          loadSounds();
+        });
+        row.appendChild(delBtn);
+      }
+
+      list.appendChild(row);
+    }
+  }
+
+  document.getElementById('sound-upload-btn').addEventListener('click', async () => {
+    const fileInput  = document.getElementById('sound-upload');
+    const statusEl   = document.getElementById('sound-upload-status');
+    const file       = fileInput.files[0];
+    if (!file) { statusEl.textContent = 'No file selected'; return; }
+
+    const form = new FormData();
+    form.append('file', file);
+    statusEl.className   = 'save-status';
+    statusEl.textContent = 'Uploading…';
+
+    try {
+      const res = await fetch('/api/sounds', { method: 'POST', body: form });
+      if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+      statusEl.className   = 'save-status ok';
+      statusEl.textContent = 'Uploaded ✓';
+      fileInput.value      = '';
+      loadSounds();
+      setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    } catch (e) {
+      statusEl.className   = 'save-status err';
+      statusEl.textContent = 'Error — ' + e.message;
+    }
+  });
+
+  loadSounds();
+
+  // ---- Save ----
   document.getElementById('save-btn').addEventListener('click', save);
   document.getElementById('add-message').addEventListener('click', () => {
     config.messages.push(['', '', '', '', '']);

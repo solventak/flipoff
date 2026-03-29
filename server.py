@@ -13,11 +13,11 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from typing import Union
+from typing import Any, Union
 
 # ---------------------------------------------------------------------------
 # Config
@@ -26,7 +26,12 @@ from typing import Union
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = Path(os.getenv("CONFIG_FILE", BASE_DIR / "config.json"))
 DEFAULT_CONFIG_FILE = BASE_DIR / "config.default.json"
-REPO_DIR = Path(os.getenv("REPO_DIR", BASE_DIR))
+REPO_DIR   = Path(os.getenv("REPO_DIR", BASE_DIR))
+SOUNDS_DIR = CONFIG_FILE.parent / "sounds"
+SOUNDS_DIR.mkdir(parents=True, exist_ok=True)
+
+BUILTIN_SOUND = "default"
+ALLOWED_SOUND_EXTS = {".mp3", ".wav", ".ogg", ".m4a", ".flac"}
 
 
 def load_config() -> dict:
@@ -285,6 +290,117 @@ async def delete_temp_message():
         _temp_timer = None
     await manager.broadcast({"type": "temp_clear"})
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Sounds API
+# ---------------------------------------------------------------------------
+
+class SoundInfo(BaseModel):
+    name: str
+    builtin: bool
+    active: bool
+
+class SetActiveSound(BaseModel):
+    name: str = Field(..., description="Sound name to set as active. Use 'default' for the built-in sound.")
+
+
+def _active_sound() -> str:
+    return load_config().get("active_sound", BUILTIN_SOUND)
+
+
+@app.get(
+    "/api/sounds",
+    response_model=list[SoundInfo],
+    summary="List available sounds",
+    description="Returns the built-in default sound plus any uploaded sounds.",
+    tags=["Sounds"],
+)
+async def list_sounds():
+    active = _active_sound()
+    sounds = [SoundInfo(name=BUILTIN_SOUND, builtin=True, active=(active == BUILTIN_SOUND))]
+    for f in sorted(SOUNDS_DIR.iterdir()):
+        if f.suffix.lower() in ALLOWED_SOUND_EXTS:
+            sounds.append(SoundInfo(name=f.stem, builtin=False, active=(active == f.stem)))
+    return sounds
+
+
+@app.post(
+    "/api/sounds",
+    response_model=OkResponse,
+    summary="Upload a sound file",
+    description="Upload an audio file (mp3, wav, ogg, m4a, flac). Saved to the sounds directory.",
+    tags=["Sounds"],
+)
+async def upload_sound(file: UploadFile):
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in ALLOWED_SOUND_EXTS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {suffix}")
+    stem = Path(file.filename).stem
+    dest = SOUNDS_DIR / f"{stem}{suffix}"
+    dest.write_bytes(await file.read())
+    return {"ok": True}
+
+
+@app.put(
+    "/api/sounds/active",
+    response_model=OkResponse,
+    summary="Set active sound",
+    description="Set which sound plays on tile flips. Use 'default' to revert to the built-in sound.",
+    tags=["Sounds"],
+)
+async def set_active_sound(body: SetActiveSound):
+    if body.name != BUILTIN_SOUND:
+        matches = list(SOUNDS_DIR.glob(f"{body.name}.*"))
+        if not matches:
+            raise HTTPException(status_code=404, detail=f"Sound not found: {body.name}")
+    config = load_config()
+    config["active_sound"] = body.name
+    save_config(config)
+    # Broadcast so displays reload sound without page refresh
+    await manager.broadcast({"type": "sound_changed", "data": {"name": body.name}})
+    return {"ok": True}
+
+
+@app.delete(
+    "/api/sounds/{name}",
+    response_model=OkResponse,
+    summary="Delete an uploaded sound",
+    description="Deletes an uploaded sound. Cannot delete the built-in default.",
+    tags=["Sounds"],
+)
+async def delete_sound(name: str):
+    if name == BUILTIN_SOUND:
+        raise HTTPException(status_code=400, detail="Cannot delete the built-in sound")
+    matches = list(SOUNDS_DIR.glob(f"{name}.*"))
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"Sound not found: {name}")
+    for f in matches:
+        f.unlink()
+    # If deleted sound was active, revert to default
+    if _active_sound() == name:
+        config = load_config()
+        config["active_sound"] = BUILTIN_SOUND
+        save_config(config)
+        await manager.broadcast({"type": "sound_changed", "data": {"name": BUILTIN_SOUND}})
+    return {"ok": True}
+
+
+@app.get(
+    "/api/sounds/{name}/file",
+    summary="Get sound file",
+    description="Serves the audio file for a sound. Use 'default' to check if built-in (returns 204).",
+    tags=["Sounds"],
+    include_in_schema=False,
+)
+async def get_sound_file(name: str):
+    if name == BUILTIN_SOUND:
+        from fastapi.responses import Response
+        return Response(status_code=204)
+    matches = list(SOUNDS_DIR.glob(f"{name}.*"))
+    if not matches:
+        raise HTTPException(status_code=404, detail=f"Sound not found: {name}")
+    return FileResponse(matches[0])
 
 
 # ---------------------------------------------------------------------------

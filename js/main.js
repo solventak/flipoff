@@ -30,6 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
   configClient.onChange((cfg) => {
     board.applyConfig(cfg);
     rotator.applyConfig(cfg);
+    // Load active sound on first config (or if it changed via config replace)
+    if (cfg.active_sound && cfg.active_sound !== soundEngine._activeSound) {
+      soundEngine.setActiveSound(cfg.active_sound);
+    }
   });
 
   // Temporary message: pause rotation and show immediately
@@ -41,6 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Temp cleared: resume normal rotation
   configClient.onTempClear(() => {
     rotator.resume();
+  });
+
+  // Sound changed: reload audio in engine
+  configClient.onSoundChanged((name) => {
+    soundEngine.setActiveSound(name);
   });
 
   // Start rotation after first config arrives (WebSocket pushes on connect)
