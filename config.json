@@ -1,14 +1,14 @@
 {
   "grid": {
-    "cols": 8,
-    "rows": 5
+    "cols": 16,
+    "rows": 12
   },
   "timing": {
     "scramble_duration": 800,
     "flip_duration": 300,
     "stagger_delay": 25,
-    "total_transition": 3800,
     "message_interval": 300000,
+    "scramble_rounds": 10,
     "temp_message_duration": 30
   },
   "colors": {

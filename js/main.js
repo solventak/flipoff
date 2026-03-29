@@ -55,10 +55,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Start rotation after first config arrives (WebSocket pushes on connect)
   let started = false;
   configClient.onChange(() => {
+    console.log('[main] config received, started:', started);
     if (!started) {
       started = true;
       rotator.start();
       statusBar.start();
+      console.log('[main] statusBar.start() called');
     }
   });
+
+  // Fallback: start statusBar even if WS config never arrives
+  setTimeout(() => {
+    if (!started) {
+      console.warn('[main] config never arrived, starting statusBar via fallback');
+      statusBar.start();
+    }
+  }, 3000);
 });

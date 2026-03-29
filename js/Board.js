@@ -243,7 +243,7 @@ export class Board {
 
     // Tiles
     const fontSize = Math.max(8, Math.floor(ts * 0.52));
-    ctx.font         = `700 ${fontSize}px "Dancing Script",cursive`;
+    ctx.font         = `700 ${fontSize}px "Helvetica Neue",Helvetica,Arial,sans-serif`;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
 
@@ -268,7 +268,7 @@ export class Board {
         // Character
         if (cell.displayChar && cell.displayChar !== ' ') {
           const light = cell.bgColor === '#FFFFFF' || cell.bgColor === '#FFCC00';
-          ctx.fillStyle = light ? '#111' : (cell.isStatus ? 'rgba(255,255,255,0.45)' : '#FFFFFF');
+          ctx.fillStyle = light ? '#111' : (cell.isStatus ? 'rgba(255,255,255,0.7)' : '#FFFFFF');
           ctx.fillText(cell.displayChar, x + (ts >> 1), y + (ts >> 1) + 1);
         }
       }

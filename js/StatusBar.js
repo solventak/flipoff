@@ -25,6 +25,7 @@ export class StatusBar {
   _tick() {
     const now  = new Date();
     const text = this._format(now, this.board.cols);
+    console.log('[StatusBar] tick', JSON.stringify(text), 'cols:', this.board.cols, 'rows:', this.board.rows);
     this.board.setStatusRow(text);
   }
 
@@ -36,25 +37,34 @@ export class StatusBar {
     const date = String(now.getDate()).padStart(2, '0');
     const mon  = months[now.getMonth()];
 
-    let h = now.getHours();
-    const m   = String(now.getMinutes()).padStart(2, '0');
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    const time = `${h}:${m} ${ampm}`;
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const time = `${h}:${m}`;
 
     const temp = this._temp || '';
+    const fullLeft = `${time}  ${day} ${date} ${mon}`;
+    const shortLeft = `${time} ${date}${mon}`;
 
-    // Build parts, fitting to available cols
-    // Full:  "10:41 AM  MON 29 MAR  72°F"
-    // Short: "10:41 29MAR 72F"
-    const full  = [time, `${day} ${date} ${mon}`, temp].filter(Boolean).join('  ');
-    const short = [time, `${date}${mon}`, temp.replace('°','')].filter(Boolean).join(' ');
+    return this._composeRow(fullLeft, shortLeft, temp, cols);
+  }
 
-    const str = full.length <= cols ? full : short.slice(0, cols);
+  _composeRow(fullLeft, shortLeft, temp, cols) {
+    if (!temp) {
+      const left = fullLeft.length <= cols ? fullLeft : shortLeft.slice(0, cols);
+      return left.padEnd(cols, ' ');
+    }
 
-    // Center-pad to cols
-    const pad = Math.max(0, Math.floor((cols - str.length) / 2));
-    return (' '.repeat(pad) + str).padEnd(cols, ' ');
+    if (fullLeft.length + 1 + temp.length <= cols) {
+      return fullLeft + ' '.repeat(cols - fullLeft.length - temp.length) + temp;
+    }
+
+    if (shortLeft.length + 1 + temp.length <= cols) {
+      return shortLeft + ' '.repeat(cols - shortLeft.length - temp.length) + temp;
+    }
+
+    return temp.length <= cols
+      ? temp.padStart(cols, ' ')
+      : temp.slice(-cols);
   }
 
   async _fetchWeather() {

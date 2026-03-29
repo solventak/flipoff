@@ -29,6 +29,10 @@ export class MessageRotator {
   }
 
   start() {
+    if (!this.messages.length) return;
+    if (this.currentIndex < 0 || this.currentIndex >= this.messages.length) {
+      this.currentIndex = 0;
+    }
     this._lastDuration = this._showCurrent(false);
     this._scheduleNext(this._lastDuration);
   }
