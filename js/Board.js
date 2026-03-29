@@ -243,7 +243,7 @@ export class Board {
 
     // Tiles
     const fontSize = Math.max(8, Math.floor(ts * 0.52));
-    ctx.font         = `700 ${fontSize}px "Helvetica Neue",Helvetica,Arial,sans-serif`;
+    ctx.font         = `700 ${fontSize}px "Dancing Script",cursive`;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
 
