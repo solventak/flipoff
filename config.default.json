@@ -7,8 +7,9 @@
     "scramble_duration": 800,
     "flip_duration": 300,
     "stagger_delay": 25,
-    "total_transition": 3800,
-    "message_interval": 4000,
+    "total_transition": { "min": 2000, "max": 4000 },
+    "message_interval": { "min": 1500, "max": 5000 },
+    "scramble_rounds": { "min": 6, "max": 18 },
     "temp_message_duration": 30
   },
   "colors": {

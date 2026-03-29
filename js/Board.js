@@ -158,9 +158,11 @@ export class Board {
     });
   }
 
-  displayMessage(lines) {
+  displayMessage(lines, scrambleRounds = 10, totalTransition = null) {
     if (this.isTransitioning) return;
     this.isTransitioning = true;
+
+    const effectiveTotalTransition = totalTransition ?? _totalTransition;
 
     // Format lines into grid
     const newGrid = this._formatToGrid(lines);
@@ -175,7 +177,7 @@ export class Board {
 
         if (newChar !== oldChar) {
           const delay = (r * this.cols + c) * _staggerDelay;
-          this.tiles[r][c].scrambleTo(newChar, delay);
+          this.tiles[r][c].scrambleTo(newChar, delay, scrambleRounds);
           hasChanges = true;
         }
       }
@@ -196,7 +198,7 @@ export class Board {
     // Clear transitioning flag after animation completes
     setTimeout(() => {
       this.isTransitioning = false;
-    }, _totalTransition + 200);
+    }, effectiveTotalTransition + 200);
   }
 
   _formatToGrid(lines) {

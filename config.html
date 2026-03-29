@@ -355,7 +355,10 @@
 <div class="container">
   <div class="header">
     <h1>FlipOff. Config</h1>
-    <a href="/" target="_blank">↗ View display</a>
+    <div style="display:flex;gap:16px;align-items:center">
+      <a href="/send">↗ Send message</a>
+      <a href="/" target="_blank">↗ View display</a>
+    </div>
   </div>
 
   <!-- Grid -->
@@ -391,13 +394,24 @@
     </div>
     <div class="row">
       <label>Total transition</label>
-      <input type="number" id="timing-total" min="0" step="100" value="3800">
-      <span class="hint">ms</span>
+      <input type="number" id="timing-total-min" min="0" step="100" value="3800">
+      <span class="hint">–</span>
+      <input type="number" id="timing-total-max" min="0" step="100" value="3800">
+      <span class="hint">ms (set equal for fixed)</span>
     </div>
     <div class="row">
       <label>Message interval</label>
-      <input type="number" id="timing-interval" min="0" step="500" value="4000">
-      <span class="hint">ms between messages</span>
+      <input type="number" id="timing-interval-min" min="0" step="500" value="4000">
+      <span class="hint">–</span>
+      <input type="number" id="timing-interval-max" min="0" step="500" value="4000">
+      <span class="hint">ms (set equal for fixed)</span>
+    </div>
+    <div class="row">
+      <label>Scramble rounds</label>
+      <input type="number" id="timing-scramble-rounds-min" min="1" max="50" step="1" value="10">
+      <span class="hint">–</span>
+      <input type="number" id="timing-scramble-rounds-max" min="1" max="50" step="1" value="10">
+      <span class="hint">flips per tile (1–50, set equal for fixed)</span>
     </div>
     <div class="row">
       <label>Temp message duration</label>
@@ -459,8 +473,16 @@
     document.getElementById('timing-scramble').value = config.timing.scramble_duration;
     document.getElementById('timing-flip').value = config.timing.flip_duration;
     document.getElementById('timing-stagger').value = config.timing.stagger_delay;
-    document.getElementById('timing-total').value = config.timing.total_transition;
-    document.getElementById('timing-interval').value = config.timing.message_interval;
+
+    const setRange = (baseId, value) => {
+      const isRange = value !== null && typeof value === 'object';
+      document.getElementById(`${baseId}-min`).value = isRange ? value.min : value;
+      document.getElementById(`${baseId}-max`).value = isRange ? value.max : value;
+    };
+    setRange('timing-total', config.timing.total_transition);
+    setRange('timing-interval', config.timing.message_interval);
+    setRange('timing-scramble-rounds', config.timing.scramble_rounds ?? 10);
+
     document.getElementById('timing-temp-duration').value = config.timing.temp_message_duration ?? 30;
 
     renderColorList('scramble-colors', config.colors.scramble_colors);
@@ -569,6 +591,12 @@
     });
   }
 
+  function collectRange(baseId, key) {
+    const min = parseInt(document.getElementById(`${baseId}-min`).value);
+    const max = parseInt(document.getElementById(`${baseId}-max`).value);
+    return { [key]: min === max ? min : { min: Math.min(min, max), max: Math.max(min, max) } };
+  }
+
   function collectConfig() {
     return {
       grid: {
@@ -579,8 +607,9 @@
         scramble_duration: parseInt(document.getElementById('timing-scramble').value),
         flip_duration: parseInt(document.getElementById('timing-flip').value),
         stagger_delay: parseInt(document.getElementById('timing-stagger').value),
-        total_transition: parseInt(document.getElementById('timing-total').value),
-        message_interval: parseInt(document.getElementById('timing-interval').value),
+        ...collectRange('timing-total', 'total_transition'),
+        ...collectRange('timing-interval', 'message_interval'),
+        ...collectRange('timing-scramble-rounds', 'scramble_rounds'),
         temp_message_duration: parseInt(document.getElementById('timing-temp-duration').value),
       },
       colors: {

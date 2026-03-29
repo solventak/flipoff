@@ -17,6 +17,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from typing import Union
 
 # ---------------------------------------------------------------------------
 # Config
@@ -42,6 +43,14 @@ def save_config(data: dict) -> None:
 # Pydantic models
 # ---------------------------------------------------------------------------
 
+class IntRange(BaseModel):
+    min: int
+    max: int
+
+
+RangeOrInt = Union[int, IntRange]
+
+
 class GridConfig(BaseModel):
     cols: int = Field(16, description="Number of tile columns")
     rows: int = Field(10, description="Number of tile rows")
@@ -51,8 +60,9 @@ class TimingConfig(BaseModel):
     scramble_duration: int = Field(800, description="Total scramble animation duration (ms)")
     flip_duration: int = Field(300, description="Duration of each individual tile flip (ms)")
     stagger_delay: int = Field(25, description="Delay between each tile starting its flip (ms)")
-    total_transition: int = Field(3800, description="Total time for a full message transition (ms)")
-    message_interval: int = Field(4000, description="Time between auto-advancing messages (ms)")
+    total_transition: RangeOrInt = Field(3800, description="Total transition duration (ms). Fixed int or {min, max} for random range per message.")
+    message_interval: RangeOrInt = Field(4000, description="Time between messages (ms). Fixed int or {min, max} for random range per message.")
+    scramble_rounds: RangeOrInt = Field(10, description="Scramble cycles per tile (1–50). Fixed int or {min, max} for random range per message.")
     temp_message_duration: int = Field(30, description="Default duration (seconds) for temporary messages before reverting")
 
 
@@ -344,6 +354,11 @@ async def rollback():
 @app.get("/config", response_class=HTMLResponse, include_in_schema=False)
 async def config_page():
     return (BASE_DIR / "config.html").read_text()
+
+
+@app.get("/send", response_class=HTMLResponse, include_in_schema=False)
+async def send_page():
+    return (BASE_DIR / "send.html").read_text()
 
 
 # ---------------------------------------------------------------------------

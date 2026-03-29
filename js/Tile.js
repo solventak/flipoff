@@ -37,7 +37,7 @@ export class Tile {
     this.frontEl.style.backgroundColor = '';
   }
 
-  scrambleTo(targetChar, delay) {
+  scrambleTo(targetChar, delay, rounds = 10) {
     if (targetChar === this.currentChar) return;
 
     // Cancel any in-progress animation
@@ -50,7 +50,7 @@ export class Tile {
     setTimeout(() => {
       this.el.classList.add('scrambling');
       let scrambleCount = 0;
-      const maxScrambles = 10 + Math.floor(Math.random() * 4);
+      const maxScrambles = Math.max(1, Math.min(50, rounds));
       const scrambleInterval = 70;
 
       this._scrambleTimer = setInterval(() => {
