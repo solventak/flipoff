@@ -6,7 +6,7 @@ export class SoundEngine {
     this.muted = false;
     this._initialized = false;
     this._audioBuffer = null;
-    this._currentSource = null;
+    this._voices = new Set(); // active playback pool (max 4)
   }
 
   async init() {
@@ -39,37 +39,32 @@ export class SoundEngine {
   }
 
   /**
-   * Play a single short click — a slice of the transition clip.
-   * Throttled internally so at most one click fires per CLICK_INTERVAL_MS,
-   * matching the scramble frame rate.
+   * Play the full clip as a click. At most MAX_VOICES play simultaneously —
+   * if the pool is full, the click is skipped (no cutoff, no overlap pile-up).
    */
   playClick() {
     if (!this.ctx || !this._audioBuffer || this.muted) return;
     this.resume();
 
-    const CLICK_DURATION_SEC  = 0.15;  // how much of the clip to play
-    const CLICK_FADE_SEC      = 0.05;  // quick fade-out at the end
-    const CLICK_INTERVAL_MS   = 70;    // minimum ms between clicks
+    const MAX_VOICES = 4;
 
-    const now = this.ctx.currentTime;
+    // Pool full — skip rather than cut anything off
+    if (this._voices.size >= MAX_VOICES) return;
 
-    // Throttle: skip if a click fired too recently
-    if (this._lastClickTime && (now - this._lastClickTime) < (CLICK_INTERVAL_MS / 1000)) return;
-    this._lastClickTime = now;
-
+    const t      = this.ctx.currentTime;
     const source = this.ctx.createBufferSource();
     source.buffer = this._audioBuffer;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.7, now);
-    gain.gain.setValueAtTime(0.7, now + CLICK_DURATION_SEC - CLICK_FADE_SEC);
-    gain.gain.linearRampToValueAtTime(0, now + CLICK_DURATION_SEC);
+    gain.gain.setValueAtTime(0.7, t);
 
     source.connect(gain);
     gain.connect(this.ctx.destination);
 
     source.start(0);
-    source.stop(now + CLICK_DURATION_SEC + 0.01);
+
+    this._voices.add(source);
+    source.onended = () => this._voices.delete(source);
   }
 
   // Keep for API compat
