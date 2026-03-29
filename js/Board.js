@@ -77,8 +77,10 @@ export class Board {
     this._canvasH = 0;
 
     // RAF state
-    this._animating = false;
-    this._dirty     = true;
+    this._animating   = false;
+    this._dirty       = true;
+    this._lastRafTime = 0;
+    this._rafInterval = 1000 / 30; // cap at 30fps to spare CPU on Pi
 
     // Resize observer
     this._ro = new ResizeObserver(() => this._onResize());
@@ -152,6 +154,10 @@ export class Board {
     requestAnimationFrame(this._loop);
 
     if (!this._animating && !this._dirty) return;
+
+    // Throttle to ~30fps
+    if (now - this._lastRafTime < this._rafInterval) return;
+    this._lastRafTime = now;
 
     let stillAnimating = false;
     let frameDirty = this._dirty;
@@ -341,7 +347,7 @@ export class Board {
       }
     }
 
-    if (hasChanges && this.soundEngine) this.soundEngine.playTransition();
+    if (hasChanges && this.soundEngine) this.soundEngine.playTransition(ttMs);
 
     this.accentIndex++;
     this._currentGrid = newGrid;

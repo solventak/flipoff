@@ -39,38 +39,50 @@ export class SoundEngine {
   }
 
   /**
-   * Play the full transition sound once.
-   * This is a single recorded clip of a split-flap board transition,
-   * played once per message change (not per tile).
+   * Play the transition sound, fading it out to match the transition duration.
+   * @param {number} durationMs - how long the visual transition lasts (ms)
    */
-  playTransition() {
+  playTransition(durationMs = 3800) {
     if (!this.ctx || !this._audioBuffer || this.muted) return;
     this.resume();
 
-    // Stop any currently playing transition sound
+    // Stop any currently playing transition sound immediately
     if (this._currentSource) {
       try {
+        this._currentGain.gain.cancelScheduledValues(0);
+        this._currentGain.gain.setValueAtTime(0, this.ctx.currentTime);
         this._currentSource.stop();
-      } catch (e) {
-        // ignore if already stopped
-      }
+      } catch (e) {}
+      this._currentSource = null;
+      this._currentGain = null;
     }
 
     const source = this.ctx.createBufferSource();
     source.buffer = this._audioBuffer;
 
     const gain = this.ctx.createGain();
-    gain.gain.value = 0.8;
+    gain.gain.setValueAtTime(0.8, this.ctx.currentTime);
+
+    // Fade out to 0 over the last 300ms of the transition
+    const durationSec = durationMs / 1000;
+    const fadeStart   = Math.max(0, durationSec - 0.3);
+    gain.gain.setValueAtTime(0.8, this.ctx.currentTime + fadeStart);
+    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + durationSec);
 
     source.connect(gain);
     gain.connect(this.ctx.destination);
 
     source.start(0);
+    // Schedule hard stop after fade completes (prevents clip playing past transition)
+    source.stop(this.ctx.currentTime + durationSec + 0.05);
+
     this._currentSource = source;
+    this._currentGain   = gain;
 
     source.onended = () => {
       if (this._currentSource === source) {
         this._currentSource = null;
+        this._currentGain   = null;
       }
     };
   }
