@@ -182,6 +182,7 @@ export class Board {
               cell.displayChar = CHARSET[Math.floor(Math.random() * CHARSET.length)];
               cell.bgColor     = this._scrambleColors[frameIndex % this._scrambleColors.length];
               frameDirty = true;
+              if (this.soundEngine) this.soundEngine.playClick();
             }
             stillAnimating = true;
           } else {
@@ -347,7 +348,7 @@ export class Board {
       }
     }
 
-    if (hasChanges && this.soundEngine) this.soundEngine.playTransition(ttMs);
+    // Sound is now driven per-frame in the RAF loop via playClick()
 
     this.accentIndex++;
     this._currentGrid = newGrid;

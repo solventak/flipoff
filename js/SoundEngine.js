@@ -39,52 +39,42 @@ export class SoundEngine {
   }
 
   /**
-   * Play the transition sound, fading it out to match the transition duration.
-   * @param {number} durationMs - how long the visual transition lasts (ms)
+   * Play a single short click — a slice of the transition clip.
+   * Throttled internally so at most one click fires per CLICK_INTERVAL_MS,
+   * matching the scramble frame rate.
    */
-  playTransition(durationMs = 3800) {
+  playClick() {
     if (!this.ctx || !this._audioBuffer || this.muted) return;
     this.resume();
 
-    // Stop any currently playing transition sound immediately
-    if (this._currentSource) {
-      try {
-        this._currentGain.gain.cancelScheduledValues(0);
-        this._currentGain.gain.setValueAtTime(0, this.ctx.currentTime);
-        this._currentSource.stop();
-      } catch (e) {}
-      this._currentSource = null;
-      this._currentGain = null;
-    }
+    const CLICK_DURATION_SEC  = 0.15;  // how much of the clip to play
+    const CLICK_FADE_SEC      = 0.05;  // quick fade-out at the end
+    const CLICK_INTERVAL_MS   = 70;    // minimum ms between clicks
+
+    const now = this.ctx.currentTime;
+
+    // Throttle: skip if a click fired too recently
+    if (this._lastClickTime && (now - this._lastClickTime) < (CLICK_INTERVAL_MS / 1000)) return;
+    this._lastClickTime = now;
 
     const source = this.ctx.createBufferSource();
     source.buffer = this._audioBuffer;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.8, this.ctx.currentTime);
-
-    // Fade out to 0 over the last 300ms of the transition
-    const durationSec = durationMs / 1000;
-    const fadeStart   = Math.max(0, durationSec - 0.3);
-    gain.gain.setValueAtTime(0.8, this.ctx.currentTime + fadeStart);
-    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + durationSec);
+    gain.gain.setValueAtTime(0.7, now);
+    gain.gain.setValueAtTime(0.7, now + CLICK_DURATION_SEC - CLICK_FADE_SEC);
+    gain.gain.linearRampToValueAtTime(0, now + CLICK_DURATION_SEC);
 
     source.connect(gain);
     gain.connect(this.ctx.destination);
 
     source.start(0);
-    // Schedule hard stop after fade completes (prevents clip playing past transition)
-    source.stop(this.ctx.currentTime + durationSec + 0.05);
+    source.stop(now + CLICK_DURATION_SEC + 0.01);
+  }
 
-    this._currentSource = source;
-    this._currentGain   = gain;
-
-    source.onended = () => {
-      if (this._currentSource === source) {
-        this._currentSource = null;
-        this._currentGain   = null;
-      }
-    };
+  // Keep for API compat
+  playTransition() {
+    this.playClick();
   }
 
   /** Get the duration of the transition audio clip in ms */
