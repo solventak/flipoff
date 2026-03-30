@@ -11,6 +11,9 @@ export class SoundEngine {
     this._voices        = new Set();
     this._activeSound   = 'default'; // 'default' = built-in base64
     this._loading       = false;
+    this._loadPromise   = null;
+    this._resumePromise = null;
+    this._pendingPlay   = false;
   }
 
   async init() {
@@ -18,9 +21,11 @@ export class SoundEngine {
     this.ctx          = new (window.AudioContext || window.webkitAudioContext)();
     this._initialized = true;
     await this._loadBuiltin();
+    await this.warm();
   }
 
   async _loadBuiltin() {
+    this._loading = true;
     try {
       const binaryStr = atob(FLAP_AUDIO_BASE64);
       const bytes     = new Uint8Array(binaryStr.length);
@@ -28,6 +33,8 @@ export class SoundEngine {
       this._audioBuffer = await this.ctx.decodeAudioData(bytes.buffer);
     } catch (e) {
       console.warn('Failed to decode built-in flap audio:', e);
+    } finally {
+      this._loading = false;
     }
   }
 
@@ -46,6 +53,45 @@ export class SoundEngine {
     }
   }
 
+  async _ensureResumed() {
+    if (!this.ctx) return false;
+    if (this.ctx.state === 'running') return true;
+    if (!this._resumePromise) {
+      this._resumePromise = this.ctx.resume()
+        .catch((e) => {
+          console.warn('Failed to resume audio context:', e);
+          return false;
+        })
+        .finally(() => {
+          this._resumePromise = null;
+        });
+    }
+    await this._resumePromise;
+    return this.ctx.state === 'running';
+  }
+
+  async warm() {
+    if (!this.ctx) return false;
+    const resumed = await this._ensureResumed();
+    if (!resumed) return false;
+
+    // Prime the output path so the first audible flap after idle is not delayed.
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.ctx.createBuffer(1, 1, this.ctx.sampleRate);
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0;
+    source.connect(gain);
+    gain.connect(this.ctx.destination);
+    source.start();
+    return true;
+  }
+
+  async ensureReady() {
+    if (!this.ctx) return false;
+    if (this._loadPromise) await this._loadPromise;
+    return this.warm();
+  }
+
   /**
    * Switch to a different sound. Called when the server broadcasts sound_changed.
    * @param {string} name - sound name, or 'default' for built-in
@@ -54,15 +100,19 @@ export class SoundEngine {
     this._activeSound = name;
     this.stopAll();
     if (!this._initialized) return; // will load on init()
-    if (name === 'default') {
-      await this._loadBuiltin();
-    } else {
-      await this._loadFromUrl(`/api/sounds/${encodeURIComponent(name)}/file`);
+    this._loadPromise = name === 'default'
+      ? this._loadBuiltin()
+      : this._loadFromUrl(`/api/sounds/${encodeURIComponent(name)}/file`);
+    try {
+      await this._loadPromise;
+      await this.warm();
+    } finally {
+      this._loadPromise = null;
     }
   }
 
   resume() {
-    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+    return this._ensureResumed();
   }
 
   toggleMute() {
@@ -72,7 +122,16 @@ export class SoundEngine {
 
   playClick() {
     if (!this.ctx || !this._audioBuffer || this.muted || this._loading) return;
-    this.resume();
+    if (this.ctx.state !== 'running') {
+      if (!this._pendingPlay) {
+        this._pendingPlay = true;
+        this.warm().then((ready) => {
+          this._pendingPlay = false;
+          if (ready) this.playClick();
+        });
+      }
+      return;
+    }
     if (this._voices.size >= MAX_VOICES) return;
 
     const t      = this.ctx.currentTime;

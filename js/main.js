@@ -19,12 +19,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (audioInitialized) return;
     audioInitialized = true;
     await soundEngine.init();
-    soundEngine.resume();
+    const activeSound = configClient.get().active_sound;
+    if (activeSound && activeSound !== soundEngine._activeSound) {
+      await soundEngine.setActiveSound(activeSound);
+    } else {
+      await soundEngine.ensureReady();
+    }
     document.removeEventListener('click', initAudio);
     document.removeEventListener('keydown', initAudio);
   };
   document.addEventListener('click', initAudio);
   document.addEventListener('keydown', initAudio);
+
+  const warmAudio = () => {
+    if (!audioInitialized) return;
+    soundEngine.ensureReady();
+  };
+  window.addEventListener('focus', warmAudio);
+  window.addEventListener('pageshow', warmAudio);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) warmAudio();
+  });
 
   // Apply config and react to live updates
   configClient.onChange((cfg) => {
@@ -39,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Temporary message: pause rotation and show immediately
   configClient.onTempMessage((message) => {
     rotator.pause();
-    board.displayMessage(message);
+    board.displayMessage(message, configClient.get().timing.scramble_rounds);
   });
 
   // Temp cleared: resume normal rotation
