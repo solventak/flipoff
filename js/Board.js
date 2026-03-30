@@ -261,16 +261,16 @@ export class Board {
         ctx.fillStyle = cell.bgColor || TILE_BG;
         this._rr(ctx, x + 1, y + 1, ts - 2, ts - 2, 2);
 
-        // Split line
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fillRect(x + 1, y + (ts >> 1), ts - 2, 1);
-
         // Character
         if (cell.displayChar && cell.displayChar !== ' ') {
           const light = cell.bgColor === '#FFFFFF' || cell.bgColor === '#FFCC00';
           ctx.fillStyle = light ? '#111' : (cell.isStatus ? 'rgba(255,255,255,0.7)' : '#FFFFFF');
           ctx.fillText(cell.displayChar, x + (ts >> 1), y + (ts >> 1) + 1);
         }
+
+        // Split line sits above the glyph so the mechanical seam crosses the character cleanly.
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(x + 1, y + (ts >> 1), ts - 2, 1);
       }
     }
 
